@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 // ============================================================
 // DATA
@@ -107,6 +107,28 @@ const CHARACTERS = {
 const ACTIVE_GENRE_IDS = GENRES.filter(g => g.active).map(g => g.id);
 const ALL_CHARS = Object.values(CHARACTERS).flat();
 const ACTIVE_CHARS = ALL_CHARS.filter(c => ACTIVE_GENRE_IDS.some(id => c.id.startsWith(id)));
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+const STORAGE_KEY = "mainichiCollection_v1";
+
+function loadStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveStorage(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString("ja-JP");
+}
+
 const RARITY_COLOR = { N:"#62C462", R:"#4A90E2", SR:"#F5A623" };
 const RARITY_BG    = { N:"#EBF7EB", R:"#EAF2FF", SR:"#FFF7E6" };
 const GACHA_COST   = 5;   // points per gacha
@@ -115,7 +137,7 @@ const CLEAR_BONUS  = 2;   // bonus for full clear
 const PARENT_BONUS = 2;   // bonus from parent
 
 function makePlayer(name) {
-  return { name, points: 0, collection: {}, tasks: [] };
+  return { name, points: 0, collection: {}, tasks: [], lastReset: todayStr() };
 }
 
 function rollGacha() {
@@ -388,16 +410,17 @@ function PinModal({ onSuccess, onClose, correctPin }) {
 // ============================================================
 export default function App() {
   // Setup screen
-  const [screen, setScreen]         = useState("setup"); // setup | main
+  const [screen, setScreen]         = useState(() => loadStorage() ? "main" : "setup");
   const [setupNames, setSetupNames] = useState(["", ""]);
   const [setupCount, setSetupCount] = useState(2);
   const [setupPin, setSetupPin]     = useState("");
   const [setupPin2, setSetupPin2]   = useState("");
   const [setupPinErr, setSetupPinErr] = useState("");
 
-  // Game state
-  const [players, setPlayers]       = useState([]);
-  const [pin, setPin]               = useState("1234");
+  // Game state - load from localStorage if available
+  const saved = loadStorage();
+  const [players, setPlayers]       = useState(() => saved?.players || []);
+  const [pin, setPin]               = useState(() => saved?.pin || "1234");
   const [current, setCurrent]       = useState(0);
   const [tab, setTab]               = useState("todo");
 
@@ -436,6 +459,25 @@ export default function App() {
     setTimeout(()=>setFloaters(f=>f.filter(fl=>fl.id!==id)),900);
   }
 
+  // Save to localStorage on every change
+  useEffect(() => {
+    if (players.length > 0) {
+      saveStorage({ players, pin });
+    }
+  }, [players, pin]);
+
+  // Auto-reset tasks daily
+  useEffect(() => {
+    if (players.length === 0) return;
+    const today = todayStr();
+    setPlayers(prev => prev.map(p => {
+      if (p.lastReset !== today) {
+        return { ...p, tasks: p.tasks.map(t => ({ ...t, done: false })), lastReset: today };
+      }
+      return p;
+    }));
+  }, []);
+
   const player = players[current] || makePlayer("?");
 
   function updatePlayer(idx, fn) {
@@ -447,10 +489,12 @@ export default function App() {
     if (setupPin.length < 4) { setSetupPinErr("PINは4けた以上にしてください"); return; }
     if (setupPin !== setupPin2) { setSetupPinErr("PINがあっていません"); return; }
     const names = setupNames.slice(0, setupCount).map((n,i)=>n.trim()||`プレイヤー${i+1}`);
-    setPlayers(names.map(makePlayer));
+    const newPlayers = names.map(makePlayer);
+    setPlayers(newPlayers);
     setPin(setupPin);
     setEditNames(names);
     setEditCount(setupCount);
+    saveStorage({ players: newPlayers, pin: setupPin });
     setScreen("main");
   }
 
