@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from "react";
 // DATA
 // ============================================================
 const GENRES = [
-  { id: "umiu",    name: "ウミウシ",   emoji: "🐚", color: "#5BC8E8", active: true },
-  { id: "chyo",    name: "ちょうちょ", emoji: "🦋", color: "#B787E0", active: true },
-  { id: "sakana",  name: "さかな",     emoji: "🐠", color: "#4ECDC4", active: false },
-  { id: "hana",    name: "はな",       emoji: "🌸", color: "#FF8FAB", active: false },
-  { id: "dobutsu", name: "どうぶつ",   emoji: "🐾", color: "#FFAA5A", active: false },
+  { id: "umiu",    name: "ウミウシ", emoji: "🐚", color: "#5BC8E8", active: true },
+  { id: "kinoko",  name: "きのこ",   emoji: "🍄", color: "#A0784A", active: true },
+  { id: "houseki", name: "宝石",     emoji: "💎", color: "#B787E0", active: true },
+  { id: "hana",    name: "はな",     emoji: "🌸", color: "#FF8FAB", active: true },
+  { id: "sakana",  name: "さかな",   emoji: "🐠", color: "#4ECDC4", active: false },
+  { id: "dobutsu", name: "どうぶつ", emoji: "🐾", color: "#FFAA5A", active: false },
 ];
 
 const CHARACTERS = {
@@ -30,23 +31,59 @@ const CHARACTERS = {
     {id:"umiu_28",name:"オーロラミウシ",rarity:"SR"},{id:"umiu_29",name:"ほしのしんかい",rarity:"SR"},
     {id:"umiu_30",name:"いにしえのラグナ",rarity:"SR"},
   ],
-  chyo: [
-    {id:"chyo_01",name:"ちょうこ",rarity:"N"},{id:"chyo_02",name:"きあげは",rarity:"N"},
-    {id:"chyo_03",name:"あおすじ",rarity:"N"},{id:"chyo_04",name:"しましま",rarity:"N"},
-    {id:"chyo_05",name:"きらりん",rarity:"N"},{id:"chyo_06",name:"てんてん",rarity:"N"},
-    {id:"chyo_07",name:"みどりん",rarity:"N"},{id:"chyo_08",name:"きいろちゃん",rarity:"N"},
-    {id:"chyo_09",name:"べにこ",rarity:"N"},{id:"chyo_10",name:"こまち",rarity:"N"},
-    {id:"chyo_11",name:"るりたては",rarity:"N"},{id:"chyo_12",name:"ひめあか",rarity:"N"},
-    {id:"chyo_13",name:"うらら",rarity:"N"},{id:"chyo_14",name:"くろしろ",rarity:"N"},
-    {id:"chyo_15",name:"おれんじ",rarity:"N"},{id:"chyo_16",name:"しらはね",rarity:"N"},
-    {id:"chyo_17",name:"てんとう",rarity:"N"},{id:"chyo_18",name:"よぞら",rarity:"N"},
-    {id:"chyo_19",name:"みずいろ",rarity:"R"},{id:"chyo_20",name:"きんきら",rarity:"R"},
-    {id:"chyo_21",name:"はねぼかし",rarity:"R"},{id:"chyo_22",name:"すみれ",rarity:"R"},
-    {id:"chyo_23",name:"はごろも",rarity:"R"},{id:"chyo_24",name:"かざぐるま",rarity:"R"},
-    {id:"chyo_25",name:"みやび",rarity:"R"},{id:"chyo_26",name:"はなびら",rarity:"R"},
-    {id:"chyo_27",name:"しまきら",rarity:"R"},
-    {id:"chyo_28",name:"ゆめおおるり",rarity:"SR"},{id:"chyo_29",name:"ぎんせかい",rarity:"SR"},
-    {id:"chyo_30",name:"しろきせき",rarity:"SR"},
+  kinoko: [
+    {id:"kinoko_01",name:"しいたん",rarity:"N"},{id:"kinoko_02",name:"えのぴょん",rarity:"N"},
+    {id:"kinoko_03",name:"しめたん",rarity:"N"},{id:"kinoko_04",name:"なめこちゃん",rarity:"N"},
+    {id:"kinoko_05",name:"えりんぎー",rarity:"N"},{id:"kinoko_06",name:"まいたけくん",rarity:"N"},
+    {id:"kinoko_07",name:"ひらたけん",rarity:"N"},{id:"kinoko_08",name:"ぼたん",rarity:"N"},
+    {id:"kinoko_09",name:"きくらげん",rarity:"N"},{id:"kinoko_10",name:"ぶなしめじ",rarity:"N"},
+    {id:"kinoko_11",name:"はなびらちゃん",rarity:"N"},{id:"kinoko_12",name:"くりたけん",rarity:"N"},
+    {id:"kinoko_13",name:"こぶちゃん",rarity:"N"},{id:"kinoko_14",name:"ひらきん",rarity:"N"},
+    {id:"kinoko_15",name:"かさたん",rarity:"N"},{id:"kinoko_16",name:"あみたけん",rarity:"N"},
+    {id:"kinoko_17",name:"こけしちゃん",rarity:"N"},{id:"kinoko_18",name:"くろまめくん",rarity:"N"},
+    {id:"kinoko_19",name:"べにまる",rarity:"R"},{id:"kinoko_20",name:"たまごん",rarity:"R"},
+    {id:"kinoko_21",name:"むらさきちゃん",rarity:"R"},{id:"kinoko_22",name:"どくつるくん",rarity:"R"},
+    {id:"kinoko_23",name:"みどりのこ",rarity:"R"},{id:"kinoko_24",name:"ながいもくん",rarity:"R"},
+    {id:"kinoko_25",name:"はなふわり",rarity:"R"},{id:"kinoko_26",name:"ぴかぴかちゃん",rarity:"R"},
+    {id:"kinoko_27",name:"よぞらちゃん",rarity:"R"},
+    {id:"kinoko_28",name:"もふじい",rarity:"SR"},{id:"kinoko_29",name:"ひとよちゃん",rarity:"SR"},
+    {id:"kinoko_30",name:"つきぼう",rarity:"SR"},
+  ],
+  houseki: [
+    {id:"houseki_01",name:"きらりん",rarity:"N"},{id:"houseki_02",name:"むらさきん",rarity:"N"},
+    {id:"houseki_03",name:"ももこはる",rarity:"N"},{id:"houseki_04",name:"おひさま",rarity:"N"},
+    {id:"houseki_05",name:"とらめくん",rarity:"N"},{id:"houseki_06",name:"みずいろん",rarity:"N"},
+    {id:"houseki_07",name:"みどりん",rarity:"N"},{id:"houseki_08",name:"ゆきだま",rarity:"N"},
+    {id:"houseki_09",name:"しろつき",rarity:"N"},{id:"houseki_10",name:"そらしずく",rarity:"N"},
+    {id:"houseki_11",name:"きみどり",rarity:"N"},{id:"houseki_12",name:"あかりん",rarity:"N"},
+    {id:"houseki_13",name:"さくらいろ",rarity:"N"},{id:"houseki_14",name:"ぎんぼし",rarity:"N"},
+    {id:"houseki_15",name:"みるくん",rarity:"N"},{id:"houseki_16",name:"ちゃいろう",rarity:"N"},
+    {id:"houseki_17",name:"にじみん",rarity:"N"},{id:"houseki_18",name:"きらこ",rarity:"N"},
+    {id:"houseki_19",name:"ゆめつき",rarity:"R"},{id:"houseki_20",name:"にじひめ",rarity:"R"},
+    {id:"houseki_21",name:"ほしうみ",rarity:"R"},{id:"houseki_22",name:"こおりのこころ",rarity:"R"},
+    {id:"houseki_23",name:"あおぞら",rarity:"R"},{id:"houseki_24",name:"ほししずく",rarity:"R"},
+    {id:"houseki_25",name:"きせきん",rarity:"R"},{id:"houseki_26",name:"しんびちゃん",rarity:"R"},
+    {id:"houseki_27",name:"ぎんが",rarity:"R"},
+    {id:"houseki_28",name:"おうさま",rarity:"SR"},{id:"houseki_29",name:"あかのひめ",rarity:"SR"},
+    {id:"houseki_30",name:"あおのおうじ",rarity:"SR"},
+  ],
+  hana: [
+    {id:"hana_01",name:"たんぽぽ",rarity:"N"},{id:"hana_02",name:"チューリップ",rarity:"N"},
+    {id:"hana_03",name:"スミレちゃん",rarity:"N"},{id:"hana_04",name:"サクラコ",rarity:"N"},
+    {id:"hana_05",name:"アサガオ",rarity:"N"},{id:"hana_06",name:"ヒマワリ",rarity:"N"},
+    {id:"hana_07",name:"マーガレット",rarity:"N"},{id:"hana_08",name:"ナノハナ",rarity:"N"},
+    {id:"hana_09",name:"タチアオイ",rarity:"N"},{id:"hana_10",name:"クローバー",rarity:"N"},
+    {id:"hana_11",name:"コスモス",rarity:"N"},{id:"hana_12",name:"スイセン",rarity:"N"},
+    {id:"hana_13",name:"パンジー",rarity:"N"},{id:"hana_14",name:"ネモフィラ",rarity:"N"},
+    {id:"hana_15",name:"スズラン",rarity:"N"},{id:"hana_16",name:"カーネーション",rarity:"N"},
+    {id:"hana_17",name:"ツツジ",rarity:"N"},{id:"hana_18",name:"ツバキ",rarity:"N"},
+    {id:"hana_19",name:"ダリア",rarity:"R"},{id:"hana_20",name:"ラナンキュラス",rarity:"R"},
+    {id:"hana_21",name:"ガーベラ",rarity:"R"},{id:"hana_22",name:"アネモネ",rarity:"R"},
+    {id:"hana_23",name:"クリスマスローズ",rarity:"R"},{id:"hana_24",name:"フリージア",rarity:"R"},
+    {id:"hana_25",name:"カンパニュラ",rarity:"R"},{id:"hana_26",name:"ラベンダー",rarity:"R"},
+    {id:"hana_27",name:"ブルースター",rarity:"R"},
+    {id:"hana_28",name:"青いバラ",rarity:"SR"},{id:"hana_29",name:"月下美人",rarity:"SR"},
+    {id:"hana_30",name:"オオオニバス",rarity:"SR"},
   ],
   sakana: [
     {id:"sakana_01",name:"にもりん",rarity:"N"},{id:"sakana_02",name:"しまぼよ",rarity:"N"},
@@ -65,24 +102,6 @@ const CHARACTERS = {
     {id:"sakana_27",name:"ぎんぴか",rarity:"R"},
     {id:"sakana_28",name:"ほしじんべえ",rarity:"SR"},{id:"sakana_29",name:"りゅうごう",rarity:"SR"},
     {id:"sakana_30",name:"おーろらまんた",rarity:"SR"},
-  ],
-  hana: [
-    {id:"hana_01",name:"たんぽぽ",rarity:"N"},{id:"hana_02",name:"チューリップ",rarity:"N"},
-    {id:"hana_03",name:"スミれちゃん",rarity:"N"},{id:"hana_04",name:"サクラこ",rarity:"N"},
-    {id:"hana_05",name:"アサガオ",rarity:"N"},{id:"hana_06",name:"ヒマワリ",rarity:"N"},
-    {id:"hana_07",name:"マーガレット",rarity:"N"},{id:"hana_08",name:"ナノハナ",rarity:"N"},
-    {id:"hana_09",name:"タチアオイ",rarity:"N"},{id:"hana_10",name:"クローバー",rarity:"N"},
-    {id:"hana_11",name:"コスモス",rarity:"N"},{id:"hana_12",name:"スイセン",rarity:"N"},
-    {id:"hana_13",name:"パンジー",rarity:"N"},{id:"hana_14",name:"ネモフィラ",rarity:"N"},
-    {id:"hana_15",name:"スズラン",rarity:"N"},{id:"hana_16",name:"カーネーション",rarity:"N"},
-    {id:"hana_17",name:"ツツジ",rarity:"N"},{id:"hana_18",name:"ツバキ",rarity:"N"},
-    {id:"hana_19",name:"ダリア",rarity:"R"},{id:"hana_20",name:"ラナンキュラス",rarity:"R"},
-    {id:"hana_21",name:"ガーベラ",rarity:"R"},{id:"hana_22",name:"アネモネ",rarity:"R"},
-    {id:"hana_23",name:"クリスマスローズ",rarity:"R"},{id:"hana_24",name:"フリージア",rarity:"R"},
-    {id:"hana_25",name:"カンパニュラ",rarity:"R"},{id:"hana_26",name:"ラベンダー",rarity:"R"},
-    {id:"hana_27",name:"ブルースター",rarity:"R"},
-    {id:"hana_28",name:"青いバラ",rarity:"SR"},{id:"hana_29",name:"月下美人",rarity:"SR"},
-    {id:"hana_30",name:"オオオニバス",rarity:"SR"},
   ],
   dobutsu: [
     {id:"dobutsu_01",name:"しばころ",rarity:"N"},{id:"dobutsu_02",name:"もふうさ",rarity:"N"},
@@ -131,10 +150,10 @@ function todayStr() {
 
 const RARITY_COLOR = { N:"#62C462", R:"#4A90E2", SR:"#F5A623" };
 const RARITY_BG    = { N:"#EBF7EB", R:"#EAF2FF", SR:"#FFF7E6" };
-const GACHA_COST   = 5;   // points per gacha
-const TASK_PT      = 1;   // points per task
-const CLEAR_BONUS  = 2;   // bonus for full clear
-const PARENT_BONUS = 2;   // bonus from parent
+const GACHA_COST   = 5;
+const TASK_PT      = 1;
+const CLEAR_BONUS  = 2;
+const PARENT_BONUS = 2;
 
 function makePlayer(name) {
   return { name, points: 0, collection: {}, tasks: [], lastReset: todayStr() };
@@ -149,7 +168,9 @@ function rollGacha() {
 
 function getCharImage(charId) {
   const prefix = charId.split("_")[0];
-  if (prefix === "umiu" || prefix === "chyo") {
+  // 画像が用意されているジャンルはここに追加していく
+  const imageGenres = ["umiu", "kinoko", "houseki", "hana"];
+  if (imageGenres.includes(prefix)) {
     return `/images/${charId}.png`;
   }
   return null;
@@ -217,7 +238,6 @@ function CardSlot({ char, collected, onSelect }) {
         opacity: collected ? 1 : 0.45,
         transition:"all 0.15s",
         cursor: collected ? "pointer" : "default",
-        transform: collected ? undefined : undefined,
       }}>
       <div style={{ width:44, height:44, display:"flex", alignItems:"center", justifyContent:"center" }}>
         {collected
@@ -257,7 +277,6 @@ function CharDetail({ char, count, onClose }) {
         boxShadow:`0 12px 48px ${RARITY_COLOR[char.rarity]}44`,
         position:"relative",
       }}>
-        {/* Close */}
         <button onClick={onClose} style={{
           position:"absolute", top:14, right:14,
           background:"#f0f0f0", border:"none", borderRadius:"50%",
@@ -265,16 +284,12 @@ function CharDetail({ char, count, onClose }) {
           display:"flex", alignItems:"center", justifyContent:"center",
           fontWeight:900,
         }}>✕</button>
-
-        {/* Rarity ribbon */}
         <div style={{
           position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
           background:RARITY_COLOR[char.rarity], color:"white",
           borderRadius:"0 0 14px 14px", padding:"4px 20px",
           fontWeight:900, fontSize:13, letterSpacing:2,
         }}>{char.rarity}</div>
-
-        {/* Image or emoji big */}
         <div style={{
           marginTop:20, marginBottom:8,
           filter:`drop-shadow(0 4px 12px ${RARITY_COLOR[char.rarity]}66)`,
@@ -284,13 +299,9 @@ function CharDetail({ char, count, onClose }) {
             ? <img src={getCharImage(char.id)} alt={char.name} style={{ width:160, height:160, objectFit:"contain" }}/>
             : <span style={{ fontSize:96 }}>{genre?.emoji || "🎴"}</span>}
         </div>
-
-        {/* Name */}
         <div style={{ fontWeight:900, fontSize:26, color:"#333", marginBottom:6 }}>
           {char.name}
         </div>
-
-        {/* Genre */}
         <div style={{
           display:"inline-flex", alignItems:"center", gap:6,
           background: genre ? `${genre.color}22` : "#f5f5f5",
@@ -300,8 +311,6 @@ function CharDetail({ char, count, onClose }) {
         }}>
           {genre?.emoji} {genre?.name}
         </div>
-
-        {/* Count */}
         {count > 1 && (
           <div style={{ color:"#bbb", fontSize:12, marginTop:4 }}>
             × {count} もってる
@@ -320,7 +329,6 @@ function GachaEffect({ rarity }) {
   const particles = Array.from({ length: isSR ? 40 : 20 }, (_, i) => i);
   return (
     <div style={{ position:"fixed", inset:0, pointerEvents:"none", zIndex:1500, overflow:"hidden" }}>
-      {/* Flash overlay for SR */}
       {isSR && (
         <div style={{
           position:"absolute", inset:0,
@@ -328,7 +336,6 @@ function GachaEffect({ rarity }) {
           animation:"srFlash 0.6s ease-out forwards",
         }}/>
       )}
-      {/* Light beams for SR */}
       {isSR && Array.from({length:8}).map((_,i)=>(
         <div key={i} style={{
           position:"absolute", top:"40%", left:"50%",
@@ -340,7 +347,6 @@ function GachaEffect({ rarity }) {
           opacity:0,
         }}/>
       ))}
-      {/* Falling particles */}
       {particles.map(i => {
         const x = Math.random()*100;
         const delay = Math.random()*1.2;
@@ -409,7 +415,6 @@ function PinModal({ onSuccess, onClose, correctPin }) {
 // MAIN APP
 // ============================================================
 export default function App() {
-  // Setup screen
   const [screen, setScreen]         = useState(() => loadStorage() ? "main" : "setup");
   const [setupNames, setSetupNames] = useState(["", ""]);
   const [setupCount, setSetupCount] = useState(2);
@@ -417,39 +422,32 @@ export default function App() {
   const [setupPin2, setSetupPin2]   = useState("");
   const [setupPinErr, setSetupPinErr] = useState("");
 
-  // Game state - load from localStorage if available
   const saved = loadStorage();
   const [players, setPlayers]       = useState(() => saved?.players || []);
   const [pin, setPin]               = useState(() => saved?.pin || "1234");
   const [current, setCurrent]       = useState(0);
   const [tab, setTab]               = useState("todo");
 
-  // Parent modal
   const [parentOpen, setParentOpen] = useState(false);
   const [parentAuth, setParentAuth] = useState(false);
   const [parentTab, setParentTab]   = useState("tasks");
   const [newTask, setNewTask]       = useState("");
 
-  // PIN change
   const [newPin, setNewPin]         = useState("");
   const [newPin2, setNewPin2]       = useState("");
   const [pinChangeMsg, setPinChangeMsg] = useState("");
 
-  // Player settings
   const [editNames, setEditNames]   = useState([]);
   const [editCount, setEditCount]   = useState(2);
 
-  // Gacha
   const [gachaAnim, setGachaAnim]   = useState(false);
   const [gachaEffect, setGachaEffect] = useState(false);
   const [gachaResult, setGachaResult] = useState(null);
   const [gachaIsNew, setGachaIsNew] = useState(false);
 
-  // Zukan
   const [zukanGenre, setZukanGenre] = useState("umiu");
   const [selectedChar, setSelectedChar] = useState(null);
 
-  // FX
   const [floaters, setFloaters]     = useState([]);
   const fxId = useRef(0);
 
@@ -459,14 +457,12 @@ export default function App() {
     setTimeout(()=>setFloaters(f=>f.filter(fl=>fl.id!==id)),900);
   }
 
-  // Save to localStorage on every change
   useEffect(() => {
     if (players.length > 0) {
       saveStorage({ players, pin });
     }
   }, [players, pin]);
 
-  // Auto-reset tasks daily
   useEffect(() => {
     if (players.length === 0) return;
     const today = todayStr();
@@ -484,7 +480,6 @@ export default function App() {
     setPlayers(prev=>prev.map((p,i)=>i===idx?fn(p):p));
   }
 
-  // ---- SETUP ----
   function startGame() {
     if (setupPin.length < 4) { setSetupPinErr("PINは4けた以上にしてください"); return; }
     if (setupPin !== setupPin2) { setSetupPinErr("PINがあっていません"); return; }
@@ -498,7 +493,6 @@ export default function App() {
     setScreen("main");
   }
 
-  // ---- TASKS ----
   function completeTask(taskId, e) {
     const task = player.tasks.find(t=>t.id===taskId);
     if (!task||task.done) return;
@@ -529,7 +523,6 @@ export default function App() {
     updatePlayer(current, p=>({...p, tasks:p.tasks.map(t=>({...t,done:false}))}));
   }
 
-  // ---- GACHA ----
   function doGacha() {
     if (player.points < GACHA_COST || gachaAnim) return;
     setGachaAnim(true);
@@ -550,7 +543,6 @@ export default function App() {
     },1500);
   }
 
-  // ---- PARENT SETTINGS ----
   function applyPlayerSettings() {
     const newNames = editNames.slice(0,editCount).map((n,i)=>n.trim()||`プレイヤー${i+1}`);
     setPlayers(prev=>{
@@ -582,6 +574,7 @@ export default function App() {
   const doneTasks  = player.tasks.filter(t=>t.done).length;
   const totalTasks = player.tasks.length;
   const collected  = Object.keys(player.collection).length;
+  const totalActive = ACTIVE_CHARS.length;
   const canGacha   = Math.floor(player.points / GACHA_COST);
 
   // ============================================================
@@ -611,8 +604,6 @@ export default function App() {
       <p style={{ color:"#bbb", fontSize:13, marginBottom:28 }}>さいしょにせっていしよう！</p>
 
       <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:14 }}>
-
-        {/* Player count */}
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>こどものにんずう</div>
           <div style={{ display:"flex", gap:8 }}>
@@ -627,7 +618,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Names */}
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>なまえ</div>
           {Array.from({length:setupCount}).map((_,i)=>(
@@ -642,7 +632,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* PIN */}
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>おやモードのPINコード</div>
           <input type="password" value={setupPin} onChange={e=>setSetupPin(e.target.value)}
@@ -675,6 +664,17 @@ export default function App() {
       minHeight:"100vh", background:"linear-gradient(160deg,#FFF8E1,#E3F2FD)",
       fontFamily:"'Kosugi Maru',sans-serif", paddingBottom:80,
     }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
+        @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-70px) scale(1.5)}}
+        @keyframes popIn{0%{transform:scale(0);opacity:0}80%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+        @keyframes gachaShake{0%,100%{transform:scale(1) rotate(0)}25%{transform:scale(1.05) rotate(-6deg)}75%{transform:scale(1.05) rotate(6deg)}}
+        @keyframes newBadge{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+        @keyframes particleFall{0%{opacity:1;transform:translateY(0) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
+        @keyframes srFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+        @keyframes beamFade{0%{opacity:0}20%{opacity:0.7}100%{opacity:0}}
+      `}</style>
       <Floaters items={floaters}/>
 
       {/* HEADER */}
@@ -683,7 +683,6 @@ export default function App() {
         padding:"12px 14px 14px", borderRadius:"0 0 22px 22px",
         boxShadow:"0 4px 18px rgba(0,0,0,0.10)",
       }}>
-        {/* Player tabs */}
         <div style={{ display:"flex", gap:6, marginBottom:10 }}>
           {players.map((p,i)=>(
             <button key={i} onClick={()=>{setCurrent(i);setGachaResult(null);}} style={{
@@ -701,11 +700,10 @@ export default function App() {
           }}>🔐</button>
         </div>
 
-        {/* Stats */}
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
           <div style={{ flex:1, background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"7px 10px", textAlign:"center" }}>
             <div style={{ fontSize:9, color:"#aaa" }}>ずかん</div>
-            <div style={{ fontWeight:900, color:"#FF8C00", fontSize:15 }}>{collected}<span style={{ fontSize:10, color:"#ccc" }}>/150</span></div>
+            <div style={{ fontWeight:900, color:"#FF8C00", fontSize:15 }}>{collected}<span style={{ fontSize:10, color:"#ccc" }}>/{totalActive}</span></div>
           </div>
           <div style={{ flex:1, background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"7px 10px", textAlign:"center" }}>
             <div style={{ fontSize:9, color:"#aaa" }}>タスク</div>
@@ -717,7 +715,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Point bar */}
         <div style={{ background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"8px 12px" }}>
           <PointBar points={player.points}/>
         </div>
@@ -761,8 +758,6 @@ export default function App() {
                     fontFamily:"inherit", color:"#bbb"
                   }}>リセット</button>
                 </div>
-
-                {/* progress */}
                 <div style={{ background:"#eee", borderRadius:99, height:8, marginBottom:12, overflow:"hidden" }}>
                   <div style={{
                     width:totalTasks>0?`${(doneTasks/totalTasks)*100}%`:"0%", height:"100%",
@@ -770,7 +765,6 @@ export default function App() {
                     borderRadius:99, transition:"width 0.5s ease"
                   }}/>
                 </div>
-
                 {player.tasks.map(task=>(
                   <button key={task.id}
                     onClick={e=>completeTask(task.id,e)}
@@ -807,8 +801,6 @@ export default function App() {
             <div style={{ fontSize:13, color:"#bbb", marginBottom:20 }}>
               いまのポイント：<b style={{ color:"#FF8C00" }}>{player.points}pt</b>　ひける回数：<b style={{ color:"#4A90E2" }}>{canGacha}回</b>
             </div>
-
-            {/* Ball */}
             <div onClick={doGacha} style={{
               width:160, height:160, borderRadius:"50%",
               margin:"0 auto 24px",
@@ -823,7 +815,6 @@ export default function App() {
             }}>
               {gachaAnim ? "🌀" : "🎰"}
             </div>
-
             <button onClick={doGacha} disabled={canGacha<1||gachaAnim} style={{
               background: canGacha>0 ? "linear-gradient(135deg,#FF6B6B,#FFD700)" : "#eee",
               border:"none", borderRadius:99, padding:"13px 36px",
@@ -834,13 +825,11 @@ export default function App() {
             }}>
               {gachaAnim ? "ひいてる…🌀" : `ガチャをひく！（${GACHA_COST}pt）`}
             </button>
-
             {canGacha<1 && (
               <div style={{ marginTop:14, color:"#FFB347", fontWeight:700, fontSize:13 }}>
                 タスクをこなしてポイントをためよう！
               </div>
             )}
-
             {gachaResult && !gachaAnim && (
               <div style={{
                 marginTop:28, padding:"22px 18px", borderRadius:22,
@@ -911,10 +900,8 @@ export default function App() {
         )}
       </div>
 
-      {/* ===== GACHA EFFECT ===== */}
       {gachaEffect && gachaResult && <GachaEffect rarity={gachaResult.rarity}/>}
 
-      {/* ===== CHAR DETAIL MODAL ===== */}
       {selectedChar && (
         <CharDetail
           char={selectedChar}
@@ -923,7 +910,7 @@ export default function App() {
         />
       )}
 
-      {/* ===== PARENT MODAL ===== */}
+      {/* PARENT MODAL */}
       {parentOpen && (
         <div style={{
           position:"fixed", inset:0, background:"rgba(0,0,0,0.5)",
@@ -949,8 +936,6 @@ export default function App() {
                     background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#bbb"
                   }}>✕</button>
                 </div>
-
-                {/* Sub-tabs */}
                 <div style={{ display:"flex", gap:6, marginBottom:16, overflowX:"auto" }}>
                   {[["tasks","📋 タスク"],["bonus","🎁 ボーナス"],["settings","⚙️ せってい"]].map(([key,label])=>(
                     <button key={key} onClick={()=>setParentTab(key)} style={{
@@ -962,7 +947,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* TASKS */}
                 {parentTab==="tasks" && (
                   <>
                     <div style={{ display:"flex", gap:8, marginBottom:10 }}>
@@ -1000,7 +984,6 @@ export default function App() {
                   </>
                 )}
 
-                {/* BONUS */}
                 {parentTab==="bonus" && (
                   <div style={{ textAlign:"center", paddingTop:8 }}>
                     <div style={{ fontSize:48, marginBottom:12 }}>🎁</div>
@@ -1019,10 +1002,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* SETTINGS */}
                 {parentTab==="settings" && (
                   <>
-                    {/* Player count & names */}
                     <div style={{ background:"#f9f9f9", borderRadius:14, padding:14, marginBottom:14 }}>
                       <div style={{ fontWeight:800, color:"#555", fontSize:13, marginBottom:10 }}>👦 プレイヤーせってい</div>
                       <div style={{ display:"flex", gap:6, marginBottom:12 }}>
@@ -1049,8 +1030,6 @@ export default function App() {
                         color:"white", cursor:"pointer"
                       }}>てきよう</button>
                     </div>
-
-                    {/* PIN change */}
                     <div style={{ background:"#f9f9f9", borderRadius:14, padding:14 }}>
                       <div style={{ fontWeight:800, color:"#555", fontSize:13, marginBottom:10 }}>🔐 PINコードをかえる</div>
                       <input type="password" value={newPin} onChange={e=>setNewPin(e.target.value)}
