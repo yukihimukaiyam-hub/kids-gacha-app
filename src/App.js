@@ -126,6 +126,7 @@ const CHARACTERS = {
 const ACTIVE_GENRE_IDS = GENRES.filter(g => g.active).map(g => g.id);
 const ALL_CHARS = Object.values(CHARACTERS).flat();
 const ACTIVE_CHARS = ALL_CHARS.filter(c => ACTIVE_GENRE_IDS.some(id => c.id.startsWith(id)));
+
 // ============================================================
 // STORAGE HELPERS
 // ============================================================
@@ -137,13 +138,9 @@ function loadStorage() {
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
-
 function saveStorage(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
 }
-
 function todayStr() {
   return new Date().toLocaleDateString("ja-JP");
 }
@@ -153,29 +150,40 @@ const RARITY_BG    = { N:"#EBF7EB", R:"#EAF2FF", SR:"#FFF7E6" };
 const GACHA_COST   = 5;
 const TASK_PT      = 1;
 const CLEAR_BONUS  = 2;
-const PARENT_BONUS = 2;
+const PARENT_BONUS_PT    = 2;      // ポイントボーナス
+const PARENT_BONUS_TICKET = 1;    // ガチャチケット枚数
 
-function makePlayer(name) {
-  return { name, points: 0, collection: {}, tasks: [], lastReset: todayStr() };
-}
-
-function rollGacha() {
+// ============================================================
+// SR確率設定
+// 通常: SR=7.5%, R=20%, N=72.5%
+// ダブり2回以上連続時: SR=15%, R=20%, N=65%
+// ============================================================
+function rollGacha(consecutiveDupe) {
   const r = Math.random();
-  const rarity = r < 0.05 ? "SR" : r < 0.25 ? "R" : "N";
+  const srRate = consecutiveDupe >= 2 ? 0.15 : 0.075;
+  const rarity = r < srRate ? "SR" : r < srRate + 0.20 ? "R" : "N";
   const pool = ACTIVE_CHARS.filter(c => c.rarity === rarity);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function getCharImage(charId) {
-  const prefix = charId.split("_")[0];
-  // 画像が用意されているジャンルはここに追加していく
-  const imageGenres = ["umiu", "kinoko", "houseki", "hana"];
-  if (imageGenres.includes(prefix)) {
-    return `/images/${charId}.png`;
-  }
-  return null;
+function makePlayer(name) {
+  return {
+    name,
+    points: 0,
+    tickets: 0,          // ガチャチケット枚数
+    collection: {},
+    tasks: [],
+    lastReset: todayStr(),
+    consecutiveDupe: 0,  // 連続ダブり回数
+  };
 }
 
+function getCharImage(charId) {
+  const prefix = charId.split("_")[0];
+  const imageGenres = ["umiu", "kinoko", "houseki", "hana"];
+  if (imageGenres.includes(prefix)) return `/images/${charId}.png`;
+  return null;
+}
 function getGenreEmoji(charId) {
   const g = GENRES.find(g => charId.startsWith(g.id));
   return g ? g.emoji : "🎴";
@@ -198,14 +206,15 @@ function Floaters({ items }) {
 // ============================================================
 // POINT BAR
 // ============================================================
-function PointBar({ points }) {
+function PointBar({ points, tickets }) {
   const full = Math.floor(points / GACHA_COST);
   const partial = (points % GACHA_COST) / GACHA_COST;
+  const totalGacha = full + tickets;
   return (
     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
       <div style={{ flex:1 }}>
         <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#aaa", marginBottom:3 }}>
-          <span>⭐ {points}ポイント</span>
+          <span>⭐ {points}pt {tickets > 0 && <span style={{color:"#FF8C00"}}>🎟️×{tickets}</span>}</span>
           <span>つぎのガチャまで あと{GACHA_COST - (points % GACHA_COST === 0 && points > 0 ? GACHA_COST : points % GACHA_COST)}pt</span>
         </div>
         <div style={{ background:"#eee", borderRadius:99, height:10, overflow:"hidden" }}>
@@ -217,7 +226,7 @@ function PointBar({ points }) {
         </div>
       </div>
       <div style={{ background:"#5599EE", color:"white", borderRadius:12, padding:"4px 10px", fontWeight:900, fontSize:13, whiteSpace:"nowrap" }}>
-        🎰 {full}回
+        🎰 {totalGacha}回
       </div>
     </div>
   );
@@ -281,8 +290,7 @@ function CharDetail({ char, count, onClose }) {
           position:"absolute", top:14, right:14,
           background:"#f0f0f0", border:"none", borderRadius:"50%",
           width:32, height:32, fontSize:16, cursor:"pointer", color:"#aaa",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontWeight:900,
+          display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900,
         }}>✕</button>
         <div style={{
           position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
@@ -299,9 +307,7 @@ function CharDetail({ char, count, onClose }) {
             ? <img src={getCharImage(char.id)} alt={char.name} style={{ width:160, height:160, objectFit:"contain" }}/>
             : <span style={{ fontSize:96 }}>{genre?.emoji || "🎴"}</span>}
         </div>
-        <div style={{ fontWeight:900, fontSize:26, color:"#333", marginBottom:6 }}>
-          {char.name}
-        </div>
+        <div style={{ fontWeight:900, fontSize:26, color:"#333", marginBottom:6 }}>{char.name}</div>
         <div style={{
           display:"inline-flex", alignItems:"center", gap:6,
           background: genre ? `${genre.color}22` : "#f5f5f5",
@@ -312,9 +318,7 @@ function CharDetail({ char, count, onClose }) {
           {genre?.emoji} {genre?.name}
         </div>
         {count > 1 && (
-          <div style={{ color:"#bbb", fontSize:12, marginTop:4 }}>
-            × {count} もってる
-          </div>
+          <div style={{ color:"#bbb", fontSize:12, marginTop:4 }}>× {count} もってる</div>
         )}
       </div>
     </div>
@@ -374,7 +378,7 @@ function GachaEffect({ rarity }) {
 }
 
 // ============================================================
-// PIN INPUT MODAL
+// PIN MODAL
 // ============================================================
 function PinModal({ onSuccess, onClose, correctPin }) {
   const [val, setVal] = useState("");
@@ -432,6 +436,7 @@ export default function App() {
   const [parentAuth, setParentAuth] = useState(false);
   const [parentTab, setParentTab]   = useState("tasks");
   const [newTask, setNewTask]       = useState("");
+  const [bonusType, setBonusType]   = useState("pt"); // "pt" or "ticket"
 
   const [newPin, setNewPin]         = useState("");
   const [newPin2, setNewPin2]       = useState("");
@@ -458,9 +463,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (players.length > 0) {
-      saveStorage({ players, pin });
-    }
+    if (players.length > 0) saveStorage({ players, pin });
   }, [players, pin]);
 
   useEffect(() => {
@@ -474,12 +477,19 @@ export default function App() {
     }));
   }, []);
 
-  const player = players[current] || makePlayer("?");
+  // 旧データにtickets/consecutiveDupeがない場合の補完
+  const rawPlayer = players[current] || makePlayer("?");
+  const player = {
+    tickets: 0,
+    consecutiveDupe: 0,
+    ...rawPlayer,
+  };
 
   function updatePlayer(idx, fn) {
-    setPlayers(prev=>prev.map((p,i)=>i===idx?fn(p):p));
+    setPlayers(prev=>prev.map((p,i)=>i===idx?fn({tickets:0,consecutiveDupe:0,...p}):p));
   }
 
+  // ---- SETUP ----
   function startGame() {
     if (setupPin.length < 4) { setSetupPinErr("PINは4けた以上にしてください"); return; }
     if (setupPin !== setupPin2) { setSetupPinErr("PINがあっていません"); return; }
@@ -493,6 +503,7 @@ export default function App() {
     setScreen("main");
   }
 
+  // ---- TASKS ----
   function completeTask(taskId, e) {
     const task = player.tasks.find(t=>t.id===taskId);
     if (!task||task.done) return;
@@ -514,35 +525,60 @@ export default function App() {
     updatePlayer(current, p=>({...p, tasks:[...p.tasks,{id:Date.now(),text:newTask.trim(),done:false}]}));
     setNewTask("");
   }
-
   function removeTask(id) {
     updatePlayer(current, p=>({...p, tasks:p.tasks.filter(t=>t.id!==id)}));
   }
-
   function resetTasks() {
     updatePlayer(current, p=>({...p, tasks:p.tasks.map(t=>({...t,done:false}))}));
   }
 
+  // ---- GACHA ----
   function doGacha() {
-    if (player.points < GACHA_COST || gachaAnim) return;
+    const canUseTicket = player.tickets > 0;
+    const canUsePt = player.points >= GACHA_COST;
+    if ((!canUseTicket && !canUsePt) || gachaAnim) return;
+
     setGachaAnim(true);
     setGachaResult(null);
     setTimeout(()=>{
-      const result = rollGacha();
+      const result = rollGacha(player.consecutiveDupe);
       const isNew = !player.collection[result.id];
       setGachaIsNew(isNew);
       setGachaResult(result);
       setGachaEffect(true);
       setTimeout(()=>setGachaEffect(false), 2500);
-      updatePlayer(current, p=>({
-        ...p,
-        points: p.points - GACHA_COST,
-        collection:{...p.collection,[result.id]:(p.collection[result.id]||0)+1}
-      }));
+
+      updatePlayer(current, p => {
+        const usedTicket = (p.tickets || 0) > 0;
+        const isSR = result.rarity === "SR";
+        const wasDupe = !isNew;
+        const newConsecutiveDupe = isSR ? 0 : (wasDupe ? (p.consecutiveDupe || 0) + 1 : 0);
+        return {
+          ...p,
+          points: usedTicket ? p.points : p.points - GACHA_COST,
+          tickets: usedTicket ? (p.tickets || 0) - 1 : (p.tickets || 0),
+          collection: {...p.collection, [result.id]: (p.collection[result.id]||0)+1},
+          consecutiveDupe: newConsecutiveDupe,
+        };
+      });
       setGachaAnim(false);
-    },1500);
+    }, 1500);
   }
 
+  // ---- PARENT BONUS ----
+  function giveBonus() {
+    if (bonusType === "pt") {
+      updatePlayer(current, p=>({...p, points:p.points+PARENT_BONUS_PT}));
+      addFloater(window.innerWidth/2, 200, "⭐");
+    } else {
+      updatePlayer(current, p=>({...p, tickets:(p.tickets||0)+PARENT_BONUS_TICKET}));
+      addFloater(window.innerWidth/2, 200, "🎟️");
+    }
+    setParentOpen(false);
+    setParentAuth(false);
+  }
+
+  // ---- PLAYER SETTINGS ----
   function applyPlayerSettings() {
     const newNames = editNames.slice(0,editCount).map((n,i)=>n.trim()||`プレイヤー${i+1}`);
     setPlayers(prev=>{
@@ -557,25 +593,22 @@ export default function App() {
 
   function changePin() {
     if (newPin.length < 4) { setPinChangeMsg("4けた以上にしてください"); return; }
-    if (newPin !== newPin2)  { setPinChangeMsg("PINがあっていません"); return; }
+    if (newPin !== newPin2) { setPinChangeMsg("PINがあっていません"); return; }
     setPin(newPin);
     setNewPin(""); setNewPin2("");
     setPinChangeMsg("✅ PINをかえました！");
     setTimeout(()=>setPinChangeMsg(""),2000);
   }
 
-  function giveBonus() {
-    updatePlayer(current, p=>({...p, points:p.points+PARENT_BONUS}));
-    addFloater(window.innerWidth/2, 200, "🎁");
-    setParentOpen(false);
-    setParentAuth(false);
-  }
-
   const doneTasks  = player.tasks.filter(t=>t.done).length;
   const totalTasks = player.tasks.length;
   const collected  = Object.keys(player.collection).length;
   const totalActive = ACTIVE_CHARS.length;
-  const canGacha   = Math.floor(player.points / GACHA_COST);
+  const canGachaCount = Math.floor(player.points / GACHA_COST) + (player.tickets || 0);
+  const canGacha = canGachaCount > 0;
+
+  // SR確率アップ中かどうか
+  const srBoosted = player.consecutiveDupe >= 2;
 
   // ============================================================
   // SETUP SCREEN
@@ -596,13 +629,13 @@ export default function App() {
         @keyframes particleFall{0%{opacity:1;transform:translateY(0) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
         @keyframes srFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
         @keyframes beamFade{0%{opacity:0}20%{opacity:0.7}100%{opacity:0}}
+        @keyframes srBoostPulse{0%,100%{box-shadow:0 0 0 0 #F5A62366}50%{box-shadow:0 0 0 8px #F5A62300}}
       `}</style>
       <div style={{ fontSize:52, animation:"bounce 2s infinite", marginBottom:8 }}>🌟</div>
       <h1 style={{ fontSize:26, fontWeight:900, color:"#FF8C00", margin:"0 0 4px", textAlign:"center" }}>
         まいにちコレクション
       </h1>
       <p style={{ color:"#bbb", fontSize:13, marginBottom:28 }}>さいしょにせっていしよう！</p>
-
       <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:14 }}>
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>こどものにんずう</div>
@@ -617,21 +650,17 @@ export default function App() {
             ))}
           </div>
         </div>
-
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>なまえ</div>
           {Array.from({length:setupCount}).map((_,i)=>(
             <input key={i} value={setupNames[i]||""}
               onChange={e=>setSetupNames(prev=>{const a=[...prev];a[i]=e.target.value;return a;})}
               placeholder={`プレイヤー${i+1}`}
-              style={{
-                width:"100%", padding:"10px 14px", borderRadius:12, marginBottom:8,
+              style={{ width:"100%", padding:"10px 14px", borderRadius:12, marginBottom:8,
                 border:"2px solid #FFE082", fontFamily:"inherit", fontSize:15,
-                outline:"none", boxSizing:"border-box"
-              }}/>
+                outline:"none", boxSizing:"border-box" }}/>
           ))}
         </div>
-
         <div style={{ background:"white", borderRadius:18, padding:18, boxShadow:"0 2px 12px #0001" }}>
           <div style={{ fontSize:13, fontWeight:700, color:"#888", marginBottom:10 }}>おやモードのPINコード</div>
           <input type="password" value={setupPin} onChange={e=>setSetupPin(e.target.value)}
@@ -646,7 +675,6 @@ export default function App() {
               fontSize:15, outline:"none", boxSizing:"border-box" }}/>
           {setupPinErr && <div style={{ color:"#FF4757", fontSize:12, marginTop:6 }}>{setupPinErr}</div>}
         </div>
-
         <button onClick={startGame} style={{
           background:"linear-gradient(135deg,#FFD700,#FF8C00)", border:"none",
           borderRadius:99, padding:"15px", fontFamily:"inherit", fontWeight:900,
@@ -674,6 +702,7 @@ export default function App() {
         @keyframes particleFall{0%{opacity:1;transform:translateY(0) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
         @keyframes srFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
         @keyframes beamFade{0%{opacity:0}20%{opacity:0.7}100%{opacity:0}}
+        @keyframes srBoostPulse{0%,100%{box-shadow:0 0 0 0 #F5A62388}50%{box-shadow:0 0 14px 4px #F5A62344}}
       `}</style>
       <Floaters items={floaters}/>
 
@@ -699,7 +728,6 @@ export default function App() {
             fontSize:18, cursor:"pointer"
           }}>🔐</button>
         </div>
-
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
           <div style={{ flex:1, background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"7px 10px", textAlign:"center" }}>
             <div style={{ fontSize:9, color:"#aaa" }}>ずかん</div>
@@ -711,12 +739,11 @@ export default function App() {
           </div>
           <div style={{ flex:1, background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"7px 10px", textAlign:"center" }}>
             <div style={{ fontSize:9, color:"#aaa" }}>ガチャけん</div>
-            <div style={{ fontWeight:900, color:"#4A90E2", fontSize:15 }}>🎰{canGacha}</div>
+            <div style={{ fontWeight:900, color:"#4A90E2", fontSize:15 }}>🎰{canGachaCount}</div>
           </div>
         </div>
-
         <div style={{ background:"rgba(255,255,255,0.9)", borderRadius:12, padding:"8px 12px" }}>
-          <PointBar points={player.points}/>
+          <PointBar points={player.points} tickets={player.tickets||0}/>
         </div>
       </div>
 
@@ -766,9 +793,7 @@ export default function App() {
                   }}/>
                 </div>
                 {player.tasks.map(task=>(
-                  <button key={task.id}
-                    onClick={e=>completeTask(task.id,e)}
-                    disabled={task.done}
+                  <button key={task.id} onClick={e=>completeTask(task.id,e)} disabled={task.done}
                     style={{
                       width:"100%", display:"flex", alignItems:"center", gap:12,
                       background:task.done?"#F1F8F1":"white",
@@ -782,9 +807,7 @@ export default function App() {
                     }}>
                     <span style={{ fontSize:22 }}>{task.done?"✅":"⬜"}</span>
                     <span style={{ flex:1 }}>{task.text}</span>
-                    <span style={{ fontSize:11, color:task.done?"#b2dfb2":"#FFB74D", fontWeight:700 }}>
-                      +{TASK_PT}pt
-                    </span>
+                    <span style={{ fontSize:11, color:task.done?"#b2dfb2":"#FFB74D", fontWeight:700 }}>+{TASK_PT}pt</span>
                   </button>
                 ))}
               </>
@@ -795,41 +818,71 @@ export default function App() {
         {/* ===== GACHA ===== */}
         {tab==="gacha" && (
           <div style={{ textAlign:"center", paddingTop:8 }}>
+
+            {/* SR確率アップ中バナー */}
+            {srBoosted && (
+              <div style={{
+                background:"linear-gradient(135deg,#FFF3C4,#FFE082)",
+                border:"2px solid #F5A623",
+                borderRadius:14, padding:"10px 16px", marginBottom:14,
+                animation:"srBoostPulse 1.5s ease infinite",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+              }}>
+                <span style={{ fontSize:20 }}>✨</span>
+                <div>
+                  <div style={{ fontWeight:900, color:"#B8720A", fontSize:13 }}>SR確率２倍アップ中！</div>
+                  <div style={{ fontSize:11, color:"#C8860A" }}>ダブりが{player.consecutiveDupe}回つづいてるよ</div>
+                </div>
+                <span style={{ fontSize:20 }}>✨</span>
+              </div>
+            )}
+
             <div style={{ fontSize:13, color:"#bbb", marginBottom:6 }}>
-              ガチャ1かい = <b style={{ color:"#FF8C00" }}>{GACHA_COST}ポイント</b>
+              ガチャ1かい = <b style={{ color:"#FF8C00" }}>{GACHA_COST}ポイント</b>　または　<b style={{ color:"#FF8C00" }}>ガチャチケット🎟️1まい</b>
             </div>
-            <div style={{ fontSize:13, color:"#bbb", marginBottom:20 }}>
-              いまのポイント：<b style={{ color:"#FF8C00" }}>{player.points}pt</b>　ひける回数：<b style={{ color:"#4A90E2" }}>{canGacha}回</b>
+            <div style={{ fontSize:13, color:"#bbb", marginBottom:6 }}>
+              いまのポイント：<b style={{ color:"#FF8C00" }}>{player.points}pt</b>　チケット：<b style={{ color:"#FF8C00" }}>🎟️{player.tickets||0}まい</b>
             </div>
+            <div style={{ fontSize:11, color:"#ccc", marginBottom:16 }}>
+              SR確率：<b style={{ color: srBoosted ? "#F5A623" : "#aaa" }}>{srBoosted ? "15%" : "7.5%"}</b>
+              　R確率：<b style={{ color:"#4A90E2" }}>20%</b>
+            </div>
+
+            {/* Ball */}
             <div onClick={doGacha} style={{
               width:160, height:160, borderRadius:"50%",
               margin:"0 auto 24px",
-              background: canGacha>0
+              background: canGacha
                 ? "radial-gradient(circle at 35% 35%,#fff9,transparent 60%),linear-gradient(135deg,#FF6B6B,#FFD700)"
                 : "radial-gradient(circle at 35% 35%,#fff4,transparent 60%),linear-gradient(135deg,#ccc,#e0e0e0)",
-              boxShadow: canGacha>0 ? "0 8px 30px #FF6B6B44" : "none",
+              boxShadow: canGacha
+                ? srBoosted ? "0 8px 30px #F5A62366" : "0 8px 30px #FF6B6B44"
+                : "none",
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:70, cursor:canGacha>0?"pointer":"not-allowed",
+              fontSize:70, cursor:canGacha?"pointer":"not-allowed",
               animation:gachaAnim?"gachaShake 0.15s infinite":"none",
               transition:"all 0.3s", userSelect:"none",
             }}>
               {gachaAnim ? "🌀" : "🎰"}
             </div>
-            <button onClick={doGacha} disabled={canGacha<1||gachaAnim} style={{
-              background: canGacha>0 ? "linear-gradient(135deg,#FF6B6B,#FFD700)" : "#eee",
+
+            <button onClick={doGacha} disabled={!canGacha||gachaAnim} style={{
+              background: canGacha ? "linear-gradient(135deg,#FF6B6B,#FFD700)" : "#eee",
               border:"none", borderRadius:99, padding:"13px 36px",
               fontFamily:"inherit", fontWeight:900, fontSize:17,
-              color:canGacha>0?"white":"#bbb",
-              cursor:canGacha>0?"pointer":"not-allowed",
-              boxShadow:canGacha>0?"0 4px 18px #FF6B6B44":"none",
+              color:canGacha?"white":"#bbb",
+              cursor:canGacha?"pointer":"not-allowed",
+              boxShadow:canGacha?"0 4px 18px #FF6B6B44":"none",
             }}>
-              {gachaAnim ? "ひいてる…🌀" : `ガチャをひく！（${GACHA_COST}pt）`}
+              {gachaAnim ? "ひいてる…🌀" : `ガチャをひく！（${GACHA_COST}pt or 🎟️）`}
             </button>
-            {canGacha<1 && (
+
+            {!canGacha && (
               <div style={{ marginTop:14, color:"#FFB347", fontWeight:700, fontSize:13 }}>
                 タスクをこなしてポイントをためよう！
               </div>
             )}
+
             {gachaResult && !gachaAnim && (
               <div style={{
                 marginTop:28, padding:"22px 18px", borderRadius:22,
@@ -854,7 +907,16 @@ export default function App() {
                 <span style={{ background:RARITY_COLOR[gachaResult.rarity], color:"white", borderRadius:99, padding:"3px 14px", fontSize:13, fontWeight:800 }}>
                   {gachaResult.rarity}
                 </span>
-                {!gachaIsNew && <div style={{ marginTop:10, color:"#bbb", fontSize:12 }}>かぶり！</div>}
+                {!gachaIsNew && (
+                  <div style={{ marginTop:10, color:"#bbb", fontSize:12 }}>
+                    かぶり！
+                    {!srBoosted && player.consecutiveDupe >= 1 && (
+                      <span style={{ color:"#F5A623", fontWeight:700, marginLeft:6 }}>
+                        あと{2 - player.consecutiveDupe}回かぶりでSR確率アップ✨
+                      </span>
+                    )}
+                  </div>
+                )}
                 {gachaIsNew && <div style={{ marginTop:10, color:RARITY_COLOR[gachaResult.rarity], fontSize:13, fontWeight:700 }}>ずかんについか！📖</div>}
               </div>
             )}
@@ -925,7 +987,7 @@ export default function App() {
             {!parentAuth ? (
               <PinModal
                 correctPin={pin}
-                onSuccess={()=>{setParentAuth(true);setParentTab("tasks");setNewPin("");setNewPin2("");setPinChangeMsg("");setEditNames(players.map(p=>p.name));setEditCount(players.length);}}
+                onSuccess={()=>{setParentAuth(true);setParentTab("tasks");setNewPin("");setNewPin2("");setPinChangeMsg("");setEditNames(players.map(p=>p.name));setEditCount(players.length);setBonusType("pt");}}
                 onClose={()=>setParentOpen(false)}
               />
             ) : (
@@ -947,6 +1009,7 @@ export default function App() {
                   ))}
                 </div>
 
+                {/* TASKS */}
                 {parentTab==="tasks" && (
                   <>
                     <div style={{ display:"flex", gap:8, marginBottom:10 }}>
@@ -984,24 +1047,67 @@ export default function App() {
                   </>
                 )}
 
+                {/* BONUS */}
                 {parentTab==="bonus" && (
                   <div style={{ textAlign:"center", paddingTop:8 }}>
-                    <div style={{ fontSize:48, marginBottom:12 }}>🎁</div>
-                    <div style={{ color:"#555", fontSize:15, marginBottom:6 }}>
-                      {player.name} に ボーナス +{PARENT_BONUS}pt
+                    <div style={{ fontSize:40, marginBottom:12 }}>🎁</div>
+                    <div style={{ color:"#555", fontSize:14, marginBottom:16, fontWeight:700 }}>
+                      {player.name} へのごほうびをえらんでね
                     </div>
-                    <div style={{ color:"#aaa", fontSize:12, marginBottom:24 }}>
-                      いまのポイント：{player.points}pt
+
+                    {/* ボーナス種類選択 */}
+                    <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+                      <button onClick={()=>setBonusType("pt")} style={{
+                        flex:1, padding:"16px 8px", borderRadius:16, border:"none",
+                        background: bonusType==="pt"
+                          ? "linear-gradient(135deg,#FFD700,#FF8C00)"
+                          : "#f5f5f5",
+                        color: bonusType==="pt" ? "white" : "#aaa",
+                        fontFamily:"inherit", fontWeight:900, fontSize:13,
+                        cursor:"pointer",
+                        boxShadow: bonusType==="pt" ? "0 4px 14px #FF8C0044" : "none",
+                        transition:"all 0.2s",
+                      }}>
+                        <div style={{ fontSize:28, marginBottom:4 }}>⭐</div>
+                        <div>+{PARENT_BONUS_PT}ポイント</div>
+                        <div style={{ fontSize:10, marginTop:3, opacity:0.8 }}>ポイントをプレゼント</div>
+                      </button>
+                      <button onClick={()=>setBonusType("ticket")} style={{
+                        flex:1, padding:"16px 8px", borderRadius:16, border:"none",
+                        background: bonusType==="ticket"
+                          ? "linear-gradient(135deg,#B787E0,#7B5EA7)"
+                          : "#f5f5f5",
+                        color: bonusType==="ticket" ? "white" : "#aaa",
+                        fontFamily:"inherit", fontWeight:900, fontSize:13,
+                        cursor:"pointer",
+                        boxShadow: bonusType==="ticket" ? "0 4px 14px #B787E044" : "none",
+                        transition:"all 0.2s",
+                      }}>
+                        <div style={{ fontSize:28, marginBottom:4 }}>🎟️</div>
+                        <div>ガチャ×{PARENT_BONUS_TICKET}</div>
+                        <div style={{ fontSize:10, marginTop:3, opacity:0.8 }}>すぐひけるチケット</div>
+                      </button>
                     </div>
+
+                    <div style={{ color:"#aaa", fontSize:12, marginBottom:20 }}>
+                      いまのポイント：{player.points}pt　チケット：🎟️{player.tickets||0}まい
+                    </div>
+
                     <button onClick={giveBonus} style={{
-                      background:"linear-gradient(135deg,#78D878,#4CAF50)",
+                      background: bonusType==="pt"
+                        ? "linear-gradient(135deg,#FFD700,#FF8C00)"
+                        : "linear-gradient(135deg,#B787E0,#7B5EA7)",
                       border:"none", borderRadius:99, padding:"14px 40px",
                       fontFamily:"inherit", fontWeight:900, fontSize:17, color:"white",
-                      cursor:"pointer", boxShadow:"0 4px 16px #78D87855"
-                    }}>ボーナスをあげる！🎁</button>
+                      cursor:"pointer",
+                      boxShadow: bonusType==="pt" ? "0 4px 16px #FF8C0055" : "0 4px 16px #B787E055"
+                    }}>
+                      {bonusType==="pt" ? `⭐ +${PARENT_BONUS_PT}ptをあげる！` : `🎟️ チケットをあげる！`}
+                    </button>
                   </div>
                 )}
 
+                {/* SETTINGS */}
                 {parentTab==="settings" && (
                   <>
                     <div style={{ background:"#f9f9f9", borderRadius:14, padding:14, marginBottom:14 }}>
