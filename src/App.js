@@ -526,6 +526,7 @@ export default function App() {
   const [newPin2,setNewPin2] =useState("");
   const [pinChangeMsg,setPinChangeMsg]=useState("");
   const [editNames,setEditNames]=useState([]);
+  const [restoreMsg,setRestoreMsg]=useState("");
   const [editCount,setEditCount]=useState(2);
 
   // ガチャ状態
@@ -646,6 +647,41 @@ export default function App() {
     if(newPin!==newPin2){setPinChangeMsg("PINがあっていません");return;}
     setPin(newPin); setNewPin(""); setNewPin2(""); setPinChangeMsg("✅ PINをかえました！");
     setTimeout(()=>setPinChangeMsg(""),2000);
+  }
+
+  // バックアップ：JSONファイルをダウンロード
+  function doBackup(){
+    const data = { players, pin, exportedAt: new Date().toISOString(), version: STORAGE_KEY };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mainichiCollection_backup_${new Date().toLocaleDateString("ja-JP").replace(///g,"-")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // 復元：JSONファイルを読み込む
+  function doRestore(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const data = JSON.parse(evt.target.result);
+        if(!data.players || !data.pin){ setRestoreMsg("❌ ファイルがただしくありません"); return; }
+        setPlayers(data.players);
+        setPin(data.pin);
+        saveStorage({ players: data.players, pin: data.pin });
+        setRestoreMsg("✅ データをふっげんしました！");
+        setTimeout(()=>setRestoreMsg(""),3000);
+      } catch {
+        setRestoreMsg("❌ よみこみにしっぱいしました");
+        setTimeout(()=>setRestoreMsg(""),3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   const doneTasks=player.tasks.filter(t=>t.done).length;
@@ -923,6 +959,18 @@ export default function App() {
                         style={{width:"100%",padding:"9px 13px",borderRadius:11,marginBottom:7,border:"2px solid #ddd",fontFamily:"inherit",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                       {pinChangeMsg&&<div style={{color:pinChangeMsg.startsWith("✅")?"#62C462":"#FF4757",fontSize:12,marginBottom:8}}>{pinChangeMsg}</div>}
                       <button onClick={changePin} style={{width:"100%",background:"#5BC8E8",border:"none",borderRadius:11,padding:10,fontFamily:"inherit",fontWeight:800,fontSize:14,color:"white",cursor:"pointer"}}>PINをかえる</button>
+                    </div>
+                    <div style={{background:"#f9f9f9",borderRadius:14,padding:14,marginTop:14}}>
+                      <div style={{fontWeight:800,color:"#555",fontSize:13,marginBottom:10}}>💾 データのバックアップ・ふっげん</div>
+                      <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.7}}>キャッシュ削除などでデータが消えるまえに
+バックアップファイルを保存しておこう！</div>
+                      <button onClick={doBackup} style={{width:"100%",background:"linear-gradient(135deg,#4CAF50,#2E7D32)",border:"none",borderRadius:11,padding:11,fontFamily:"inherit",fontWeight:800,fontSize:14,color:"white",cursor:"pointer",marginBottom:10}}>📥 バックアップをダウンロード</button>
+                      <div style={{fontSize:11,color:"#aaa",marginBottom:8,textAlign:"center"}}>▼ ファイルから復元する</div>
+                      <label style={{display:"block",width:"100%",background:"#f0f0f0",border:"2px dashed #ccc",borderRadius:11,padding:"10px",textAlign:"center",cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:13,color:"#aaa",boxSizing:"border-box"}}>
+                        📂 ファイルをえらぶ
+                        <input type="file" accept=".json" onChange={doRestore} style={{display:"none"}}/>
+                      </label>
+                      {restoreMsg&&<div style={{color:restoreMsg.startsWith("✅")?"#62C462":"#FF4757",fontSize:13,marginTop:10,textAlign:"center",fontWeight:700}}>{restoreMsg}</div>}
                     </div>
                   </>
                 )}
