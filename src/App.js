@@ -784,7 +784,7 @@ export default function App() {
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div style={{fontSize:12,color:"#aaa",fontWeight:700}}>{doneTasks===totalTasks&&totalTasks>0?`🎉 ぜんぶおわった！+${CLEAR_BONUS}pt ボーナス！`:`あと ${totalTasks-doneTasks}こ！`}</div>
-                  <button onClick={resetTasks} style={{background:"#f5f5f5",border:"none",borderRadius:99,padding:"4px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit",color:"#bbb"}}>リセット</button>
+                 
                 </div>
                 <div style={{background:"#eee",borderRadius:99,height:8,marginBottom:12,overflow:"hidden"}}>
                   <div style={{width:totalTasks>0?`${(doneTasks/totalTasks)*100}%`:"0%",height:"100%",background:"linear-gradient(90deg,#78D878,#FFD700)",borderRadius:99,transition:"width 0.5s ease"}}/>
