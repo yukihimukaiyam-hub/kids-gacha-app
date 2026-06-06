@@ -165,6 +165,31 @@ function getCharImage(charId) {
 function getCertImage(genreId) {
   return `/images/cert_${genreId}.png`;
 }
+// ジャンル選択対応ガチャ
+function rollGachaFiltered(consecutiveDupe, completedGenres=[], selectedGenre="all") {
+  const r = Math.random();
+  const srRate = consecutiveDupe >= 2 ? 0.15 : 0.075;
+  const rarity = r < srRate ? "SR" : r < srRate + 0.20 ? "R" : "N";
+  let pool;
+  if (selectedGenre === "all") {
+    // 全ジャンル：コンプリート済みを除外
+    pool = ACTIVE_CHARS.filter(c =>
+      c.rarity === rarity &&
+      !completedGenres.includes(c.id.split("_")[0])
+    );
+  } else {
+    // 特定ジャンル：未取得を優先、全部持ってたら重複も可
+    const genreChars = ACTIVE_CHARS.filter(c =>
+      c.rarity === rarity && c.id.startsWith(selectedGenre)
+    );
+    pool = genreChars;
+  }
+  // フォールバック
+  if (pool.length === 0) {
+    pool = ACTIVE_CHARS.filter(c => c.rarity === rarity);
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 function getGenreEmoji(charId) {
   const g = GENRES.find(g => charId.startsWith(g.id));
   return g ? g.emoji : "🎴";
@@ -693,6 +718,8 @@ export default function App() {
   const [certModal,setCertModal]=useState(null); // {genreId, genreName, genreEmoji}
   const [shownCerts,setShownCerts]=useState({}); // 表示済み認定証（セッション中）
   const [zukanGenre,setZukanGenre]=useState("umiu");
+  const [gachaGenre,setGachaGenre]=useState("all"); // "all" or genreId
+  const [certView,setCertView]=useState(null); // にんていしょうタブで選択中
   const [selectedChar,setSelectedChar]=useState(null);
   const [floaters,setFloaters]=useState([]);
   const fxId=useRef(0);
@@ -763,7 +790,8 @@ export default function App() {
     if(!canUseTicket&&!canUsePt) return;
     if(gachaReady) return;
     const completedGenres = getCompletedGenres(player.collection);
-    const result=rollGacha(player.consecutiveDupe, completedGenres);
+    // ガチャジャンル選択反映（allの場合はコンプリート除外のみ）
+    const result = rollGachaFiltered(player.consecutiveDupe, completedGenres, gachaGenre);
     const isNew=!player.collection[result.id];
     updatePlayer(current,p=>{
       const usedTicket=(p.tickets||0)>0;
@@ -879,7 +907,7 @@ export default function App() {
       </div>
 
       <div style={{display:"flex",gap:8,padding:"10px 14px 0"}}>
-        {[["todo","📋 やること"],["gacha","🎰 ガチャ"],["zukan","📖 ずかん"]].map(([key,label])=>(
+        {[["todo","📋 やること"],["gacha","🎰 ガチャ"],["zukan","📖 ずかん"],["cert","🏆 にんていしょう"]].map(([key,label])=>(
           <button key={key} onClick={()=>setTab(key)} style={{flex:1,padding:"10px 0",borderRadius:13,border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:12,background:tab===key?"#FF8C00":"white",color:tab===key?"white":"#aaa",boxShadow:tab===key?"0 3px 12px #ff8c0033":"0 1px 4px #0001",transition:"all 0.2s"}}>{label}</button>
         ))}
       </div>
@@ -917,7 +945,7 @@ export default function App() {
         {tab==="gacha"&&(
           <div style={{textAlign:"center",paddingTop:8}}>
             {srBoosted&&(
-              <div style={{background:"linear-gradient(135deg,#FFF3C4,#FFE082)",border:"2px solid #F5A623",borderRadius:14,padding:"10px 16px",marginBottom:14,animation:"srBoostPulse 1.5s ease infinite",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <div style={{background:"linear-gradient(135deg,#FFF3C4,#FFE082)",border:"2px solid #F5A623",borderRadius:14,padding:"10px 16px",marginBottom:10,animation:"srBoostPulse 1.5s ease infinite",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 <span style={{fontSize:20}}>✨</span>
                 <div>
                   <div style={{fontWeight:900,color:"#B8720A",fontSize:13}}>SR確率２倍アップ中！</div>
@@ -926,14 +954,63 @@ export default function App() {
                 <span style={{fontSize:20}}>✨</span>
               </div>
             )}
-            <div style={{fontSize:12,color:"#ccc",marginBottom:4}}>
-              SR確率：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　R：<b style={{color:"#4A90E2"}}>20%</b>　チケット：<b style={{color:"#FF8C00"}}>🎟️{player.tickets||0}</b>
+
+            {/* カテゴリ選択 */}
+            {!gachaReady&&(
+              <div style={{marginBottom:8}}>
+                <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:700}}>ガチャするカテゴリをえらぼう</div>
+                <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4,justifyContent:"center",flexWrap:"wrap"}}>
+                  {/* 全部ボタン */}
+                  <button onClick={()=>setGachaGenre("all")} style={{
+                    flexShrink:0,padding:"6px 10px",borderRadius:99,border:"none",
+                    background:gachaGenre==="all"?"#FF8C00":"#f5f5f5",
+                    color:gachaGenre==="all"?"white":"#888",
+                    fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
+                    transition:"all 0.2s",
+                  }}>🎲 全部</button>
+                  {/* 各ジャンルボタン */}
+                  {GENRES.filter(g=>g.active).map(g=>{
+                    const cnt = CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
+                    const isComplete = cnt === 30;
+                    const isSelected = gachaGenre === g.id;
+                    return(
+                      <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
+                        flexShrink:0,padding:"6px 10px",borderRadius:99,border:"none",
+                        background:isSelected?g.color:isComplete?"#f9f0ff":"#f5f5f5",
+                        color:isSelected?"white":isComplete?g.color:"#888",
+                        fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
+                        transition:"all 0.2s",
+                        border:isComplete?`1.5px solid ${g.color}`:"1.5px solid transparent",
+                        position:"relative",
+                      }}>
+                        {g.emoji} {g.name}
+                        {isComplete&&<span style={{marginLeft:3}}>🏆</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* 選択中ジャンルの進捗 */}
+                {gachaGenre!=="all"&&(()=>{
+                  const g = GENRES.find(x=>x.id===gachaGenre);
+                  const cnt = CHARACTERS[gachaGenre].filter(c=>player.collection[c.id]).length;
+                  return g ? (
+                    <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
+                      {g.emoji} {g.name}：<b style={{color:cnt===30?"#FFD700":g.color}}>{cnt}/30</b>
+                      {cnt===30&&<span style={{color:"#FFD700",marginLeft:4}}>コンプリート！🎉</span>}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
+
+            <div style={{fontSize:11,color:"#ccc",marginBottom:4}}>
+              SR：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　R：<b style={{color:"#4A90E2"}}>20%</b>　🎟️{player.tickets||0}
             </div>
             {gachaReady?(
               <GachaCapsuleAnimation key={gachaKey} resultRarity={gachaPending?.rarity||"N"} resultChar={gachaPending} consecutiveDupe={player.consecutiveDupe} onComplete={onGachaComplete}/>
             ):(
               <>
-                <button onClick={doGacha} disabled={!canGacha} style={{marginTop:24,background:canGacha?"linear-gradient(135deg,#FF6B6B,#FFD700)":"#eee",border:"none",borderRadius:99,padding:"16px 44px",fontFamily:"inherit",fontWeight:900,fontSize:18,color:canGacha?"white":"#bbb",cursor:canGacha?"pointer":"not-allowed",boxShadow:canGacha?srBoosted?"0 4px 24px #F5A62366":"0 4px 18px #FF6B6B44":"none",transition:"all 0.2s"}}>
+                <button onClick={doGacha} disabled={!canGacha} style={{marginTop:16,background:canGacha?"linear-gradient(135deg,#FF6B6B,#FFD700)":"#eee",border:"none",borderRadius:99,padding:"16px 44px",fontFamily:"inherit",fontWeight:900,fontSize:18,color:canGacha?"white":"#bbb",cursor:canGacha?"pointer":"not-allowed",boxShadow:canGacha?srBoosted?"0 4px 24px #F5A62366":"0 4px 18px #FF6B6B44":"none",transition:"all 0.2s"}}>
                   🎰 ガチャをひく！（{GACHA_COST}pt or 🎟️）
                 </button>
                 {!canGacha&&<div style={{marginTop:14,color:"#FFB347",fontWeight:700,fontSize:13}}>タスクをこなしてポイントをためよう！</div>}
@@ -972,7 +1049,85 @@ export default function App() {
             </div>
           </>
         )}
+
+        {/* にんていしょうタブ */}
+        {tab==="cert"&&(
+          <div style={{paddingTop:4}}>
+            <div style={{fontSize:12,color:"#aaa",marginBottom:12,textAlign:"center",fontWeight:700}}>
+              🏆 タップすると大きく見られるよ！
+            </div>
+            {GENRES.filter(g=>g.active).map(g=>{
+              const cnt = CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
+              const isComplete = cnt === 30;
+              return(
+                <div key={g.id} onClick={()=>isComplete&&setCertView(g.id)}
+                  style={{
+                    display:"flex",alignItems:"center",gap:12,
+                    background:isComplete?"white":"#f8f8f8",
+                    borderRadius:16,padding:"12px 14px",marginBottom:8,
+                    border:isComplete?`2px solid ${g.color}`:"2px solid #eee",
+                    cursor:isComplete?"pointer":"default",
+                    opacity:isComplete?1:0.5,
+                    transition:"all 0.2s",
+                    boxShadow:isComplete?`0 2px 10px ${g.color}22`:"none",
+                  }}>
+                  {/* ジャンル情報 */}
+                  <div style={{fontSize:32}}>{g.emoji}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:900,fontSize:14,color:isComplete?g.color:"#aaa"}}>
+                      {g.name}
+                      {isComplete&&<span style={{marginLeft:6}}>🏆</span>}
+                    </div>
+                    <div style={{fontSize:11,color:"#aaa",marginTop:2}}>
+                      {isComplete?"コンプリート！認定証を見る →":`${cnt}/30 あつめ中…`}
+                    </div>
+                  </div>
+                  {/* 認定証サムネイル or 鍵 */}
+                  {isComplete?(
+                    <img src={getCertImage(g.id)} alt={g.name}
+                      style={{width:56,height:56,objectFit:"cover",borderRadius:10,
+                        border:`2px solid ${g.color}`,
+                        boxShadow:`0 2px 8px ${g.color}44`}}
+                      onError={e=>{e.target.style.display="none";}}
+                    />
+                  ):(
+                    <div style={{width:56,height:56,borderRadius:10,background:"#eee",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>
+                      🔒
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* にんていしょう全画面表示 */}
+      {certView&&(
+        <div onClick={()=>setCertView(null)} style={{
+          position:"fixed",inset:0,zIndex:4000,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          background:"rgba(0,0,0,0.9)",padding:16,
+        }}>
+          <div style={{position:"relative",width:"100%",maxWidth:400,animation:"popIn 0.4s ease"}}>
+            <img src={getCertImage(certView)} alt="認定証"
+              style={{width:"100%",borderRadius:20,display:"block",
+                boxShadow:"0 8px 48px rgba(0,0,0,0.6)"}}
+            />
+            <button onClick={()=>setCertView(null)} style={{
+              position:"absolute",top:10,right:10,
+              background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",
+              width:36,height:36,fontSize:18,color:"white",
+              cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,
+            }}>✕</button>
+            <div style={{textAlign:"center",marginTop:12,color:"white",
+              fontWeight:900,fontSize:13,textShadow:"0 2px 8px rgba(0,0,0,0.8)"}}>
+              タップしてとじる
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedChar&&<CharDetail char={selectedChar} count={player.collection[selectedChar.id]||0} onClose={()=>setSelectedChar(null)}/>}
 
