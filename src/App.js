@@ -1,15 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 
-// ============================================================
-// DATA
-// ============================================================
 const GENRES = [
   { id: "umiu",    name: "ウミウシ", emoji: "🐚", color: "#5BC8E8", active: true },
   { id: "kinoko",  name: "きのこ",   emoji: "🍄", color: "#A0784A", active: true },
   { id: "houseki", name: "宝石",     emoji: "💎", color: "#B787E0", active: true },
   { id: "hana",    name: "はな",     emoji: "🌸", color: "#FF8FAB", active: true },
-  { id: "sakana",  name: "さかな",   emoji: "🐠", color: "#4ECDC4", active: false },
-  { id: "dobutsu", name: "どうぶつ", emoji: "🐾", color: "#FFAA5A", active: false },
+  { id: "sakana",  name: "さかな",   emoji: "🐠", color: "#4ECDC4", active: true },
+  { id: "dobutsu", name: "どうぶつ", emoji: "🐾", color: "#FFAA5A", active: true },
 ];
 
 const CHARACTERS = {
@@ -127,9 +124,6 @@ const ACTIVE_GENRE_IDS = GENRES.filter(g => g.active).map(g => g.id);
 const ALL_CHARS = Object.values(CHARACTERS).flat();
 const ACTIVE_CHARS = ALL_CHARS.filter(c => ACTIVE_GENRE_IDS.some(id => c.id.startsWith(id)));
 
-// ============================================================
-// STORAGE
-// ============================================================
 const STORAGE_KEY = "mainichiCollection_v1";
 function loadStorage() {
   try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
@@ -150,28 +144,32 @@ const PARENT_BONUS_TICKET = 1;
 function makePlayer(name) {
   return { name, points:0, tickets:0, collection:{}, tasks:[], lastReset:todayStr(), consecutiveDupe:0 };
 }
-
-function rollGacha(consecutiveDupe) {
+function rollGacha(consecutiveDupe, completedGenres=[]) {
   const r = Math.random();
   const srRate = consecutiveDupe >= 2 ? 0.15 : 0.075;
   const rarity = r < srRate ? "SR" : r < srRate + 0.20 ? "R" : "N";
-  const pool = ACTIVE_CHARS.filter(c => c.rarity === rarity);
-  return pool[Math.floor(Math.random() * pool.length)];
+  const pool = ACTIVE_CHARS.filter(c =>
+    c.rarity === rarity &&
+    !completedGenres.includes(c.id.split("_")[0])
+  );
+  const fallback = ACTIVE_CHARS.filter(c => c.rarity === rarity);
+  const target = pool.length > 0 ? pool : fallback;
+  return target[Math.floor(Math.random() * target.length)];
 }
-
 function getCharImage(charId) {
   const prefix = charId.split("_")[0];
-  if (["umiu","kinoko","houseki","hana"].includes(prefix)) return `/images/${charId}.png`;
+  const imageGenres = ["umiu","kinoko","houseki","hana","sakana","dobutsu"];
+  if (imageGenres.includes(prefix)) return `/images/${charId}.png`;
   return null;
+}
+function getCertImage(genreId) {
+  return `/images/cert_${genreId}.png`;
 }
 function getGenreEmoji(charId) {
   const g = GENRES.find(g => charId.startsWith(g.id));
   return g ? g.emoji : "🎴";
 }
 
-// ============================================================
-// CSS（全アニメーション）
-// ============================================================
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
   @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
@@ -193,84 +191,64 @@ const GLOBAL_CSS = `
   @keyframes srBoostPulse{0%,100%{box-shadow:0 0 0 0 #F5A62388}50%{box-shadow:0 0 14px 4px #F5A62344}}
 `;
 
-// ============================================================
-// FLOATERS
-// ============================================================
 function Floaters({ items }) {
   return <>{items.map(s=>(
-    <div key={s.id} style={{ position:"fixed",left:s.x-16,top:s.y-16,pointerEvents:"none",zIndex:9999,fontSize:26,animation:"floatUp 0.9s ease-out forwards" }}>{s.icon}</div>
+    <div key={s.id} style={{position:"fixed",left:s.x-16,top:s.y-16,pointerEvents:"none",zIndex:9999,fontSize:26,animation:"floatUp 0.9s ease-out forwards"}}>{s.icon}</div>
   ))}</>;
 }
 
-// ============================================================
-// POINT BAR
-// ============================================================
 function PointBar({ points, tickets }) {
   const full = Math.floor(points / GACHA_COST);
   const partial = (points % GACHA_COST) / GACHA_COST;
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-      <div style={{ flex:1 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#aaa", marginBottom:3 }}>
-          <span>⭐ {points}pt {tickets>0 && <span style={{color:"#FF8C00"}}>🎟️×{tickets}</span>}</span>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <div style={{flex:1}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#aaa",marginBottom:3}}>
+          <span>⭐ {points}pt {tickets>0&&<span style={{color:"#FF8C00"}}>🎟️×{tickets}</span>}</span>
           <span>あと{GACHA_COST-(points%GACHA_COST===0&&points>0?GACHA_COST:points%GACHA_COST)}pt</span>
         </div>
-        <div style={{ background:"#eee", borderRadius:99, height:10, overflow:"hidden" }}>
-          <div style={{ width:`${partial*100}%`,height:"100%",background:"linear-gradient(90deg,#FFD700,#FF8C00)",borderRadius:99,transition:"width 0.4s ease" }}/>
+        <div style={{background:"#eee",borderRadius:99,height:10,overflow:"hidden"}}>
+          <div style={{width:`${partial*100}%`,height:"100%",background:"linear-gradient(90deg,#FFD700,#FF8C00)",borderRadius:99,transition:"width 0.4s ease"}}/>
         </div>
       </div>
-      <div style={{ background:"#5599EE",color:"white",borderRadius:12,padding:"4px 10px",fontWeight:900,fontSize:13,whiteSpace:"nowrap" }}>
+      <div style={{background:"#5599EE",color:"white",borderRadius:12,padding:"4px 10px",fontWeight:900,fontSize:13,whiteSpace:"nowrap"}}>
         🎰 {full+(tickets||0)}回
       </div>
     </div>
   );
 }
 
-// ============================================================
-// CARD SLOT
-// ============================================================
 function CardSlot({ char, collected, onSelect }) {
   return (
     <div onClick={()=>collected&&onSelect&&onSelect(char)} style={{
-      width:72, borderRadius:12,
+      width:72,borderRadius:12,
       background:collected?RARITY_BG[char.rarity]:"#f2f2f2",
       border:`2px solid ${collected?RARITY_COLOR[char.rarity]:"#e0e0e0"}`,
-      display:"flex", flexDirection:"column", alignItems:"center",
-      padding:"8px 4px 6px", gap:3, opacity:collected?1:0.45,
-      transition:"all 0.15s", cursor:collected?"pointer":"default",
+      display:"flex",flexDirection:"column",alignItems:"center",
+      padding:"8px 4px 6px",gap:3,opacity:collected?1:0.45,
+      transition:"all 0.15s",cursor:collected?"pointer":"default",
     }}>
-      <div style={{ width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center" }}>
-        {collected
-          ?(getCharImage(char.id)?<img src={getCharImage(char.id)} alt={char.name} style={{width:44,height:44,objectFit:"contain"}}/>:<span style={{fontSize:30}}>{getGenreEmoji(char.id)}</span>)
-          :<span style={{fontSize:28}}>❓</span>}
+      <div style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {collected?(getCharImage(char.id)?<img src={getCharImage(char.id)} alt={char.name} style={{width:44,height:44,objectFit:"contain"}}/>:<span style={{fontSize:30}}>{getGenreEmoji(char.id)}</span>):<span style={{fontSize:28}}>❓</span>}
       </div>
-      <div style={{ fontSize:9,fontWeight:700,color:"#555",textAlign:"center",lineHeight:1.3,minHeight:22 }}>
-        {collected?char.name:"???"}
-      </div>
+      <div style={{fontSize:9,fontWeight:700,color:"#555",textAlign:"center",lineHeight:1.3,minHeight:22}}>{collected?char.name:"???"}</div>
       {collected&&<span style={{background:RARITY_COLOR[char.rarity],color:"white",borderRadius:99,padding:"1px 6px",fontSize:9,fontWeight:800}}>{char.rarity}</span>}
     </div>
   );
 }
 
-// ============================================================
-// CHAR DETAIL MODAL（図鑑タップ用）
-// ============================================================
 function CharDetail({ char, count, onClose }) {
   const genre = GENRES.find(g=>char.id.startsWith(g.id));
   return (
-    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:24 }} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{
-        background:"white",borderRadius:28,padding:"32px 28px",width:"100%",maxWidth:320,textAlign:"center",
-        animation:"popIn 0.35s ease",border:`4px solid ${RARITY_COLOR[char.rarity]}`,
-        boxShadow:`0 12px 48px ${RARITY_COLOR[char.rarity]}44`,position:"relative",
-      }}>
-        <button onClick={onClose} style={{ position:"absolute",top:14,right:14,background:"#f0f0f0",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",color:"#aaa",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900 }}>✕</button>
-        <div style={{ position:"absolute",top:-1,left:"50%",transform:"translateX(-50%)",background:RARITY_COLOR[char.rarity],color:"white",borderRadius:"0 0 14px 14px",padding:"4px 20px",fontWeight:900,fontSize:13,letterSpacing:2 }}>{char.rarity}</div>
-        <div style={{ marginTop:20,marginBottom:8,filter:`drop-shadow(0 4px 12px ${RARITY_COLOR[char.rarity]}66)`,display:"flex",alignItems:"center",justifyContent:"center" }}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:24}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"white",borderRadius:28,padding:"32px 28px",width:"100%",maxWidth:320,textAlign:"center",animation:"popIn 0.35s ease",border:`4px solid ${RARITY_COLOR[char.rarity]}`,boxShadow:`0 12px 48px ${RARITY_COLOR[char.rarity]}44`,position:"relative"}}>
+        <button onClick={onClose} style={{position:"absolute",top:14,right:14,background:"#f0f0f0",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",color:"#aaa",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>✕</button>
+        <div style={{position:"absolute",top:-1,left:"50%",transform:"translateX(-50%)",background:RARITY_COLOR[char.rarity],color:"white",borderRadius:"0 0 14px 14px",padding:"4px 20px",fontWeight:900,fontSize:13,letterSpacing:2}}>{char.rarity}</div>
+        <div style={{marginTop:20,marginBottom:8,filter:`drop-shadow(0 4px 12px ${RARITY_COLOR[char.rarity]}66)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
           {getCharImage(char.id)?<img src={getCharImage(char.id)} alt={char.name} style={{width:160,height:160,objectFit:"contain"}}/>:<span style={{fontSize:96}}>{genre?.emoji||"🎴"}</span>}
         </div>
-        <div style={{ fontWeight:900,fontSize:26,color:"#333",marginBottom:6 }}>{char.name}</div>
-        <div style={{ display:"inline-flex",alignItems:"center",gap:6,background:genre?`${genre.color}22`:"#f5f5f5",border:`1.5px solid ${genre?.color||"#eee"}`,borderRadius:99,padding:"5px 16px",fontSize:13,color:genre?.color||"#aaa",fontWeight:700,marginBottom:16 }}>
+        <div style={{fontWeight:900,fontSize:26,color:"#333",marginBottom:6}}>{char.name}</div>
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:genre?`${genre.color}22`:"#f5f5f5",border:`1.5px solid ${genre?.color||"#eee"}`,borderRadius:99,padding:"5px 16px",fontSize:13,color:genre?.color||"#aaa",fontWeight:700,marginBottom:16}}>
           {genre?.emoji} {genre?.name}
         </div>
         {count>1&&<div style={{color:"#bbb",fontSize:12,marginTop:4}}>× {count} もってる</div>}
@@ -279,13 +257,10 @@ function CharDetail({ char, count, onClose }) {
   );
 }
 
-// ============================================================
-// CAPSULE SVG
-// ============================================================
 function Capsule({ color1, color2, size=100, cracked=false, children }) {
   const w=size, h=size*1.2;
   return (
-    <div style={{ position:"relative",width:w,height:h }}>
+    <div style={{position:"relative",width:w,height:h}}>
       <svg width={w} height={h} viewBox="0 0 100 120" style={{position:"absolute",top:0,left:0}}>
         <defs>
           <linearGradient id="capTop" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -315,26 +290,18 @@ function CapsuleHalf({ color1, color2, half, size=100 }) {
           <stop offset="0%" stopColor={half==="top"?color1:"white"}/><stop offset="100%" stopColor={half==="top"?color2:"#ddd"}/>
         </linearGradient>
       </defs>
-      {half==="top"
-        ?<path d="M50,5 A45,45 0 0 1 95,50 L95,58 Q95,60 50,60 Q5,60 5,58 L5,50 A45,45 0 0 1 50,5 Z" fill="url(#hgtop)"/>
-        :<path d="M5,2 Q5,0 50,0 Q95,0 95,2 L95,30 A45,45 0 0 1 5,30 Z" fill="url(#hgbottom)"/>
-      }
+      {half==="top"?<path d="M50,5 A45,45 0 0 1 95,50 L95,58 Q95,60 50,60 Q5,60 5,58 L5,50 A45,45 0 0 1 50,5 Z" fill="url(#hgtop)"/>:<path d="M5,2 Q5,0 50,0 Q95,0 95,2 L95,30 A45,45 0 0 1 5,30 Z" fill="url(#hgbottom)"/>}
     </svg>
   );
 }
 
-// ============================================================
-// CHAR POPUP（ガチャ結果大表示）
-// ============================================================
 function CharPopup({ char, rarity, isNew, onClose }) {
   const isSR = rarity==="SR";
   const genre = GENRES.find(g=>char.id.startsWith(g.id));
   const img = getCharImage(char.id);
   const particles = Array.from({length:isSR?40:20},(_,i)=>i);
-
   return (
-    <div onClick={onClose} style={{ position:"fixed",inset:0,zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.78)",padding:24 }}>
-      {/* パーティクル */}
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.78)",padding:24}}>
       <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
         {isSR&&<>
           <div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 50% 40%, #fff8 0%, transparent 65%)",animation:"srFlash 0.8s ease-out forwards"}}/>
@@ -343,7 +310,7 @@ function CharPopup({ char, rarity, isNew, onClose }) {
           ))}
         </>}
         {particles.map(i=>{
-          const x=Math.random()*100, delay=Math.random()*1.0, dur=1.2+Math.random()*1.2;
+          const x=Math.random()*100,delay=Math.random()*1.0,dur=1.2+Math.random()*1.2;
           const size=isSR?12+Math.random()*16:7+Math.random()*9;
           const colors=isSR?["#FFD700","#FF8C00","#FFF","#FFFACD","#FFE066","#FFC0CB"]:rarity==="R"?["#87CEEB","#B0E0FF","#FFF","#C0D8FF"]:["#A8E6A8","#C8F0C8","#FFF","#D0F0D0"];
           const color=colors[Math.floor(Math.random()*colors.length)];
@@ -351,30 +318,16 @@ function CharPopup({ char, rarity, isNew, onClose }) {
           return <div key={i} style={{position:"absolute",left:`${x}%`,top:-20,fontSize:size,color,animation:`particleFall ${dur}s ease-in ${delay}s forwards`,opacity:0,textShadow:isSR?`0 0 10px ${color}`:"none"}}>{shape}</div>;
         })}
       </div>
-
-      {/* カード */}
-      <div onClick={e=>e.stopPropagation()} style={{
-        position:"relative",zIndex:1,background:"white",borderRadius:32,
-        padding:"40px 32px 32px",width:"100%",maxWidth:340,textAlign:"center",
-        border:`5px solid ${RARITY_COLOR[rarity]}`,
-        boxShadow:isSR?`0 0 0 2px #FFD700, 0 16px 60px #F5A62366, 0 0 80px #FFD70044`:`0 16px 50px ${RARITY_COLOR[rarity]}44`,
-        animation:"popIn 0.45s cubic-bezier(.17,.67,.35,1.3) both",
-      }}>
-        {/* レアリティリボン */}
+      <div onClick={e=>e.stopPropagation()} style={{position:"relative",zIndex:1,background:"white",borderRadius:32,padding:"40px 32px 32px",width:"100%",maxWidth:340,textAlign:"center",border:`5px solid ${RARITY_COLOR[rarity]}`,boxShadow:isSR?`0 0 0 2px #FFD700, 0 16px 60px #F5A62366, 0 0 80px #FFD70044`:`0 16px 50px ${RARITY_COLOR[rarity]}44`,animation:"popIn 0.45s cubic-bezier(.17,.67,.35,1.3) both"}}>
         <div style={{position:"absolute",top:-2,left:"50%",transform:"translateX(-50%)",background:RARITY_COLOR[rarity],color:"white",borderRadius:"0 0 18px 18px",padding:"6px 28px",fontWeight:900,fontSize:15,letterSpacing:3,boxShadow:`0 4px 14px ${RARITY_COLOR[rarity]}55`}}>{rarity}</div>
-        {/* NEWバッジ */}
         {isNew&&<div style={{position:"absolute",top:-14,right:-8,background:"#FF4757",color:"white",borderRadius:99,padding:"5px 14px",fontWeight:900,fontSize:13,animation:"newBadge 0.4s 0.3s cubic-bezier(.17,.67,.35,1.5) both",boxShadow:"0 3px 12px #FF475766"}}>NEW！</div>}
-        {/* キャラ画像 */}
         <div style={{marginTop:28,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",filter:`drop-shadow(0 6px 18px ${RARITY_COLOR[rarity]}66)`,animation:"charFloat 0.6s 0.15s cubic-bezier(.17,.67,.35,1.3) both"}}>
           {img?<img src={img} alt={char.name} style={{width:180,height:180,objectFit:"contain"}}/>:<span style={{fontSize:110}}>{genre?.emoji||"🎴"}</span>}
         </div>
-        {/* キャラ名 */}
         <div style={{fontWeight:900,fontSize:28,color:"#333",marginBottom:10,animation:"fadeUp 0.4s 0.3s ease both"}}>{char.name}</div>
-        {/* ジャンル */}
         <div style={{display:"inline-flex",alignItems:"center",gap:6,background:genre?`${genre.color}22`:"#f5f5f5",border:`1.5px solid ${genre?.color||"#eee"}`,borderRadius:99,padding:"5px 16px",fontSize:13,color:genre?.color||"#aaa",fontWeight:700,marginBottom:20,animation:"fadeUp 0.4s 0.35s ease both"}}>
           {genre?.emoji} {genre?.name}
         </div>
-        {/* とじるボタン */}
         <button onClick={onClose} style={{width:"100%",padding:"13px",background:"linear-gradient(135deg,#eee,#ddd)",border:"none",borderRadius:99,fontFamily:"inherit",fontWeight:900,fontSize:15,color:"#888",cursor:"pointer",animation:"fadeUp 0.4s 0.5s ease both"}}>
           とじる ✕
         </button>
@@ -383,22 +336,18 @@ function CharPopup({ char, rarity, isNew, onClose }) {
   );
 }
 
-// ============================================================
-// GACHA CAPSULE ANIMATION
-// ============================================================
 const MASCOTS = [
-  {id:"umiu_01",   emoji:"🐚"},{id:"kinoko_19", emoji:"🍄"},
-  {id:"houseki_20",emoji:"💎"},{id:"hana_14",   emoji:"🌸"},
+  {id:"umiu_01",emoji:"🐚"},{id:"kinoko_19",emoji:"🍄"},
+  {id:"houseki_20",emoji:"💎"},{id:"hana_14",emoji:"🌸"},
 ];
 
 function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, consecutiveDupe=0 }) {
-  const [phase, setPhase] = useState("idle");
-  const [mascotIdx, setMascotIdx] = useState(0);
-  const [showPopup, setShowPopup] = useState(false);
-  const isSR = resultRarity==="SR";
-  const srBoosted = consecutiveDupe>=2;
-
-  const capsuleColor = isSR?["#FFD700","#FFA500"]:resultRarity==="R"?["#7EC8FF","#4A90E2"]:["#A8E6A8","#62C462"];
+  const [phase,setPhase]=useState("idle");
+  const [mascotIdx,setMascotIdx]=useState(0);
+  const [showPopup,setShowPopup]=useState(false);
+  const isSR=resultRarity==="SR";
+  const srBoosted=consecutiveDupe>=2;
+  const capsuleColor=isSR?["#FFD700","#FFA500"]:resultRarity==="R"?["#7EC8FF","#4A90E2"]:["#A8E6A8","#62C462"];
 
   useEffect(()=>{
     if(phase!=="idle") return;
@@ -421,7 +370,6 @@ function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, conse
     <>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
         <div style={{position:"relative",width:130,height:170,display:"flex",alignItems:"center",justifyContent:"center"}}>
-
           {phase==="idle"&&(
             <div style={{animation:"idleBob 1.4s ease-in-out infinite",cursor:"pointer"}} onClick={startDrop}>
               <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110}>
@@ -429,23 +377,16 @@ function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, conse
               </Capsule>
             </div>
           )}
-
           {phase==="dropping"&&(
             <div style={{animation:"capsuleDrop 0.8s cubic-bezier(.17,.67,.35,1.2) forwards"}}>
-              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110}>
-                <span style={{fontSize:40}}>❓</span>
-              </Capsule>
+              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110}><span style={{fontSize:40}}>❓</span></Capsule>
             </div>
           )}
-
           {phase==="cracking"&&(
             <div style={{animation:"capsuleShake 0.3s ease-in-out"}}>
-              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110} cracked>
-                <span style={{fontSize:28}}>💥</span>
-              </Capsule>
+              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110} cracked><span style={{fontSize:28}}>💥</span></Capsule>
             </div>
           )}
-
           {phase==="revealed"&&(
             <div style={{position:"relative",width:110,height:132}}>
               <div style={{position:"absolute",top:0,left:0,right:0,animation:"topHalfFly 0.5s ease-out forwards"}}><CapsuleHalf color1={capsuleColor[0]} color2={capsuleColor[1]} half="top" size={110}/></div>
@@ -459,29 +400,62 @@ function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, conse
             </div>
           )}
         </div>
-
         {phase==="idle"&&(
           <div style={{marginTop:16,fontSize:13,color:"#aaa",fontWeight:700,animation:"idleBob 1.4s ease-in-out infinite"}}>
             {srBoosted?"✨ SR確率アップ中！タップ！":"タップしてひく！"}
           </div>
         )}
       </div>
-
       {showPopup&&resultChar&&(
-        <CharPopup
-          char={resultChar}
-          rarity={resultRarity}
-          isNew={resultChar.isNew}
-          onClose={()=>{ setShowPopup(false); onComplete&&onComplete(); }}
-        />
+        <CharPopup char={resultChar} rarity={resultRarity} isNew={resultChar.isNew} onClose={()=>{setShowPopup(false);onComplete&&onComplete();}}/>
       )}
     </>
   );
 }
 
+
 // ============================================================
-// PIN MODAL
+// 認定証モーダル
 // ============================================================
+function CertModal({ genreId, genreName, genreEmoji, onClose }) {
+  return (
+    <div onClick={onClose} style={{
+      position:'fixed', inset:0, zIndex:4000,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(0,0,0,0.85)', padding:16,
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        position:'relative', width:'100%', maxWidth:380,
+        animation:'popIn 0.5s cubic-bezier(.17,.67,.35,1.3) both',
+      }}>
+        {/* 認定証画像 */}
+        <img
+          src={getCertImage(genreId)}
+          alt={genreName + ' 認定証'}
+          style={{ width:'100%', borderRadius:20, display:'block',
+            boxShadow:'0 8px 48px rgba(0,0,0,0.6)' }}
+        />
+        {/* とじるボタン */}
+        <button onClick={onClose} style={{
+          position:'absolute', top:12, right:12,
+          background:'rgba(0,0,0,0.5)', border:'none', borderRadius:'50%',
+          width:36, height:36, fontSize:18, color:'white',
+          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+          fontWeight:900,
+        }}>✕</button>
+        <div style={{
+          marginTop:12, textAlign:'center',
+          fontFamily:"'Kosugi Maru',sans-serif",
+          fontWeight:900, fontSize:15, color:'white',
+          textShadow:'0 2px 8px rgba(0,0,0,0.8)',
+        }}>
+          タップしてとじる
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PinModal({ onSuccess, onClose, correctPin }) {
   const [val,setVal]=useState(""); const [err,setErr]=useState(false);
   function check(){ if(val===correctPin){onSuccess();}else{setErr(true);setVal("");} }
@@ -499,46 +473,228 @@ function PinModal({ onSuccess, onClose, correctPin }) {
   );
 }
 
+
 // ============================================================
-// MAIN APP
+// 全リセットパネル
 // ============================================================
+function ResetPanel({ players, current, setPlayers, setPin, setParentOpen, setParentAuth, setupPin }) {
+  const [step, setStep] = useState("idle"); // idle | confirm | done
+
+  function doReset() {
+    // 全プレイヤーのデータをリセット（名前だけ残す）
+    const resetPlayers = players.map(p => makePlayer(p.name));
+    setPlayers(resetPlayers);
+    saveStorage({ players: resetPlayers, pin: setupPin });
+    setStep("done");
+    setTimeout(() => {
+      setStep("idle");
+      setParentOpen(false);
+      setParentAuth(false);
+    }, 2000);
+  }
+
+  return (
+    <div style={{background:"#fff5f5",borderRadius:14,padding:14,marginTop:14,border:"2px solid #ffcccc"}}>
+      <div style={{fontWeight:800,color:"#e05555",fontSize:13,marginBottom:6}}>🗑️ ぜんぶリセット</div>
+      <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.7}}>
+        ポイント・コレクション・タスクを<br/>すべて削除します。名前はのこります。
+      </div>
+
+      {step === "idle" && (
+        <button onClick={()=>setStep("confirm")} style={{
+          width:"100%", background:"#f5f5f5", border:"2px solid #ffaaaa",
+          borderRadius:11, padding:10, fontFamily:"inherit",
+          fontWeight:800, fontSize:14, color:"#e05555", cursor:"pointer"
+        }}>
+          🗑️ リセットする
+        </button>
+      )}
+
+      {step === "confirm" && (
+        <div>
+          <div style={{
+            background:"#FF4757", color:"white", borderRadius:11,
+            padding:"10px 12px", marginBottom:10, fontSize:13,
+            fontWeight:700, textAlign:"center", lineHeight:1.6
+          }}>
+            ⚠️ ほんとうにリセットしますか？<br/>
+            <span style={{fontSize:11,opacity:0.9}}>この操作はもとにもどせません！</span>
+          </div>
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={()=>setStep("idle")} style={{
+              flex:1, background:"#f5f5f5", border:"none", borderRadius:11,
+              padding:11, fontFamily:"inherit", fontWeight:800,
+              fontSize:14, color:"#aaa", cursor:"pointer"
+            }}>やめる</button>
+            <button onClick={doReset} style={{
+              flex:1, background:"linear-gradient(135deg,#FF4757,#c0392b)",
+              border:"none", borderRadius:11, padding:11,
+              fontFamily:"inherit", fontWeight:800, fontSize:14,
+              color:"white", cursor:"pointer",
+              boxShadow:"0 4px 14px #FF475744"
+            }}>リセット！</button>
+          </div>
+        </div>
+      )}
+
+      {step === "done" && (
+        <div style={{
+          textAlign:"center", color:"#62C462",
+          fontWeight:900, fontSize:15, padding:8
+        }}>
+          ✅ リセットしました！
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// バックアップパネル（独立コンポーネント）
+// ============================================================
+function BackupPanel({ players, pin, setPlayers, setPin }) {
+  const [backupText, setBackupText] = useState("");
+  const [backupCopied, setBackupCopied] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState("");
+
+  function doBackup() {
+    const data = { players, pin, exportedAt: new Date().toISOString(), version: STORAGE_KEY };
+    const json = JSON.stringify(data);
+    // PC/Android: ダウンロード試行
+    try {
+      const blob = new Blob([json], { type:"application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "mainichiCollection_backup.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(_) {}
+    // iPad用: テキスト表示
+    setBackupText(json);
+    setBackupCopied(false);
+  }
+
+  function doCopyBackup() {
+    if (!backupText) return;
+    navigator.clipboard.writeText(backupText).then(() => {
+      setBackupCopied(true);
+      setTimeout(() => setBackupCopied(false), 2000);
+    }).catch(() => {
+      const ta = document.getElementById("backupTA");
+      if (ta) { ta.select(); document.execCommand("copy"); }
+      setBackupCopied(true);
+      setTimeout(() => setBackupCopied(false), 2000);
+    });
+  }
+
+  function doRestoreFromText(text) {
+    try {
+      const data = JSON.parse(text.trim());
+      if (!data.players || !data.pin) { setRestoreMsg("❌ ファイルがただしくありません"); return; }
+      setPlayers(data.players);
+      setPin(data.pin);
+      saveStorage({ players: data.players, pin: data.pin });
+      setRestoreMsg("✅ データをふっげんしました！");
+      setBackupText("");
+      setTimeout(() => setRestoreMsg(""), 3000);
+    } catch {
+      setRestoreMsg("❌ よみこみにしっぱいしました");
+      setTimeout(() => setRestoreMsg(""), 3000);
+    }
+  }
+
+  function doRestoreFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => doRestoreFromText(evt.target.result);
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  return (
+    <div style={{background:"#f9f9f9",borderRadius:14,padding:14,marginTop:14}}>
+      <div style={{fontWeight:800,color:"#555",fontSize:13,marginBottom:6}}>💾 データのバックアップ・ふっげん</div>
+      <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.7}}>
+        キャッシュ削除でデータが消えるまえに保存しておこう！
+      </div>
+
+      {/* バックアップボタン */}
+      <button onClick={doBackup} style={{width:"100%",background:"linear-gradient(135deg,#4CAF50,#2E7D32)",border:"none",borderRadius:11,padding:12,fontFamily:"inherit",fontWeight:800,fontSize:14,color:"white",cursor:"pointer",marginBottom:10}}>
+        💾 バックアップをつくる
+      </button>
+
+      {/* iPad用テキスト表示 */}
+      {backupText && (
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"#888",marginBottom:6,lineHeight:1.6}}>
+            📱 iPadの場合：下のテキストを全部コピーして<br/>メモアプリなどに保存してください
+          </div>
+          <textarea id="backupTA" readOnly value={backupText}
+            style={{width:"100%",height:80,borderRadius:10,border:"2px solid #4CAF50",padding:8,fontSize:10,fontFamily:"monospace",resize:"none",boxSizing:"border-box",color:"#555",background:"#f0fff0"}}/>
+          <button onClick={doCopyBackup} style={{width:"100%",marginTop:6,background:backupCopied?"#62C462":"linear-gradient(135deg,#4CAF50,#2E7D32)",border:"none",borderRadius:10,padding:9,fontFamily:"inherit",fontWeight:800,fontSize:13,color:"white",cursor:"pointer"}}>
+            {backupCopied ? "✅ コピーしました！" : "📋 テキストをコピー"}
+          </button>
+        </div>
+      )}
+
+      {/* 復元 */}
+      <div style={{fontSize:11,color:"#aaa",marginBottom:8,textAlign:"center"}}>▼ データをふっげんする</div>
+      <label style={{display:"block",width:"100%",background:"#f0f0f0",border:"2px dashed #ccc",borderRadius:11,padding:"12px",textAlign:"center",cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:13,color:"#aaa",boxSizing:"border-box",marginBottom:8}}>
+        📂 ファイルをえらぶ（PC・Android）
+        <input type="file" accept=".json,.txt" onChange={doRestoreFile} style={{display:"none"}}/>
+      </label>
+      <div style={{fontSize:11,color:"#ccc",marginBottom:6,textAlign:"center"}}>または</div>
+      <textarea
+        placeholder="📋 バックアップのテキストをここに貼り付け（iPad用）"
+        style={{width:"100%",height:70,borderRadius:10,border:"2px dashed #ccc",padding:8,fontSize:11,fontFamily:"monospace",resize:"none",boxSizing:"border-box",color:"#555"}}
+        onBlur={e=>{ if(e.target.value.trim()) { doRestoreFromText(e.target.value); e.target.value=""; } }}
+      />
+      {restoreMsg && (
+        <div style={{color:restoreMsg.startsWith("✅")?"#62C462":"#FF4757",fontSize:13,marginTop:8,textAlign:"center",fontWeight:700}}>
+          {restoreMsg}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
-  const [screen,setScreen]         =useState(()=>loadStorage()?"main":"setup");
-  const [setupNames,setSetupNames] =useState(["",""]);
-  const [setupCount,setSetupCount] =useState(2);
-  const [setupPin,setSetupPin]     =useState("");
-  const [setupPin2,setSetupPin2]   =useState("");
+  const [screen,setScreen]=useState(()=>loadStorage()?"main":"setup");
+  const [setupNames,setSetupNames]=useState(["",""]);
+  const [setupCount,setSetupCount]=useState(2);
+  const [setupPin,setSetupPin]=useState("");
+  const [setupPin2,setSetupPin2]=useState("");
   const [setupPinErr,setSetupPinErr]=useState("");
 
   const saved=loadStorage();
-  const [players,setPlayers] =useState(()=>saved?.players||[]);
-  const [pin,setPin]         =useState(()=>saved?.pin||"1234");
-  const [current,setCurrent] =useState(0);
-  const [tab,setTab]         =useState("todo");
+  const [players,setPlayers]=useState(()=>saved?.players||[]);
+  const [pin,setPin]=useState(()=>saved?.pin||"1234");
+  const [current,setCurrent]=useState(0);
+  const [tab,setTab]=useState("todo");
 
-  const [parentOpen,setParentOpen] =useState(false);
-  const [parentAuth,setParentAuth] =useState(false);
-  const [parentTab,setParentTab]   =useState("tasks");
-  const [newTask,setNewTask]       =useState("");
-  const [bonusType,setBonusType]   =useState("pt");
-
-  const [newPin,setNewPin]   =useState("");
-  const [newPin2,setNewPin2] =useState("");
+  const [parentOpen,setParentOpen]=useState(false);
+  const [parentAuth,setParentAuth]=useState(false);
+  const [parentTab,setParentTab]=useState("tasks");
+  const [newTask,setNewTask]=useState("");
+  const [bonusType,setBonusType]=useState("pt");
+  const [newPin,setNewPin]=useState("");
+  const [newPin2,setNewPin2]=useState("");
   const [pinChangeMsg,setPinChangeMsg]=useState("");
   const [editNames,setEditNames]=useState([]);
-  const [restoreMsg,setRestoreMsg]=useState("");
   const [editCount,setEditCount]=useState(2);
-  const [backupText,setBackupText]=useState("");   // バックアップ表示用
-  const [backupCopied,setBackupCopied]=useState(false);
 
-  // ガチャ状態
-  const [gachaKey,setGachaKey]         =useState(0);   // アニメリセット用
-  const [gachaReady,setGachaReady]     =useState(false);// カプセル表示中か
-  const [gachaPending,setGachaPending] =useState(null); // 抽選結果を保持
-
-  const [zukanGenre,setZukanGenre] =useState("umiu");
+  const [gachaKey,setGachaKey]=useState(0);
+  const [gachaReady,setGachaReady]=useState(false);
+  const [gachaPending,setGachaPending]=useState(null);
+  const [certModal,setCertModal]=useState(null); // {genreId, genreName, genreEmoji}
+  const [shownCerts,setShownCerts]=useState({}); // 表示済み認定証（セッション中）
+  const [zukanGenre,setZukanGenre]=useState("umiu");
   const [selectedChar,setSelectedChar]=useState(null);
-  const [floaters,setFloaters]     =useState([]);
+  const [floaters,setFloaters]=useState([]);
   const fxId=useRef(0);
 
   function addFloater(x,y,icon="⭐"){
@@ -548,7 +704,6 @@ export default function App() {
   }
 
   useEffect(()=>{ if(players.length>0) saveStorage({players,pin}); },[players,pin]);
-
   useEffect(()=>{
     if(players.length===0) return;
     const today=todayStr();
@@ -565,7 +720,6 @@ export default function App() {
     setPlayers(prev=>prev.map((p,i)=>i===idx?fn({tickets:0,consecutiveDupe:0,...p}):p));
   }
 
-  // SETUP
   function startGame(){
     if(setupPin.length<4){setSetupPinErr("PINは4けた以上にしてください");return;}
     if(setupPin!==setupPin2){setSetupPinErr("PINがあっていません");return;}
@@ -577,7 +731,6 @@ export default function App() {
     setScreen("main");
   }
 
-  // TASKS
   function completeTask(taskId,e){
     const task=player.tasks.find(t=>t.id===taskId);
     if(!task||task.done) return;
@@ -586,7 +739,7 @@ export default function App() {
     setPlayers(prev=>prev.map((p,i)=>{
       if(i!==current) return p;
       const tasks=p.tasks.map(t=>t.id===taskId?{...t,done:true}:t);
-      const allDone=tasks.every(t=>t.done), prevAllDone=p.tasks.every(t=>t.done);
+      const allDone=tasks.every(t=>t.done),prevAllDone=p.tasks.every(t=>t.done);
       const bonus=(allDone&&!prevAllDone)?CLEAR_BONUS:0;
       if(bonus>0) setTimeout(()=>addFloater(rect.left+rect.width/2,rect.top-30,"🎉"),300);
       return{...p,tasks,points:p.points+TASK_PT+bonus};
@@ -596,47 +749,49 @@ export default function App() {
   function removeTask(id){ updatePlayer(current,p=>({...p,tasks:p.tasks.filter(t=>t.id!==id)})); }
   function resetTasks(){ updatePlayer(current,p=>({...p,tasks:p.tasks.map(t=>({...t,done:false}))})); }
 
-  // GACHA：ボタン押下→抽選→カプセルアニメ開始
+  // コンプリート済みジャンルを計算
+  function getCompletedGenres(collection) {
+    return GENRES.filter(g => {
+      if (!g.active) return false;
+      return CHARACTERS[g.id].every(c => !!collection[c.id]);
+    }).map(g => g.id);
+  }
+
   function doGacha(){
     const canUseTicket=(player.tickets||0)>0;
     const canUsePt=player.points>=GACHA_COST;
     if(!canUseTicket&&!canUsePt) return;
     if(gachaReady) return;
-
-    // 抽選
-    const result=rollGacha(player.consecutiveDupe);
+    const completedGenres = getCompletedGenres(player.collection);
+    const result=rollGacha(player.consecutiveDupe, completedGenres);
     const isNew=!player.collection[result.id];
-
-    // データ更新
     updatePlayer(current,p=>{
       const usedTicket=(p.tickets||0)>0;
       const isSR=result.rarity==="SR";
       const wasDupe=!!p.collection[result.id];
       const newConsecutiveDupe=isSR?0:(wasDupe?(p.consecutiveDupe||0)+1:0);
-      return{
-        ...p,
-        points:usedTicket?p.points:p.points-GACHA_COST,
-        tickets:usedTicket?(p.tickets||0)-1:(p.tickets||0),
-        collection:{...p.collection,[result.id]:(p.collection[result.id]||0)+1},
-        consecutiveDupe:newConsecutiveDupe,
-      };
+      const newCollection={...p.collection,[result.id]:(p.collection[result.id]||0)+1};
+      // コンプリートチェック（ガチャ後）
+      const genreId = result.id.split("_")[0];
+      const genre = GENRES.find(g=>g.id===genreId);
+      const justCompleted = genre && CHARACTERS[genreId].every(c=>!!newCollection[c.id]);
+      if(justCompleted && !shownCerts[genreId]) {
+        setTimeout(()=>{
+          setCertModal({genreId, genreName:genre.name, genreEmoji:genre.emoji});
+          setShownCerts(prev=>({...prev,[genreId]:true}));
+        }, 2200); // ポップアップ後に表示
+      }
+      return{...p,points:usedTicket?p.points:p.points-GACHA_COST,tickets:usedTicket?(p.tickets||0)-1:(p.tickets||0),collection:newCollection,consecutiveDupe:newConsecutiveDupe};
     });
-
-    // アニメ開始
     setGachaPending({...result,isNew});
     setGachaKey(k=>k+1);
     setGachaReady(true);
   }
+  function onGachaComplete(){ setGachaReady(false); setGachaPending(null); }
 
-  function onGachaComplete(){
-    setGachaReady(false);
-    setGachaPending(null);
-  }
-
-  // BONUS
   function giveBonus(){
     if(bonusType==="pt"){ updatePlayer(current,p=>({...p,points:p.points+PARENT_BONUS_PT})); addFloater(window.innerWidth/2,200,"⭐"); }
-    else { updatePlayer(current,p=>({...p,tickets:(p.tickets||0)+PARENT_BONUS_TICKET})); addFloater(window.innerWidth/2,200,"🎟️"); }
+    else{ updatePlayer(current,p=>({...p,tickets:(p.tickets||0)+PARENT_BONUS_TICKET})); addFloater(window.innerWidth/2,200,"🎟️"); }
     setParentOpen(false); setParentAuth(false);
   }
   function applyPlayerSettings(){
@@ -651,66 +806,6 @@ export default function App() {
     setTimeout(()=>setPinChangeMsg(""),2000);
   }
 
-  // バックアップ：JSONファイルをダウンロード
-  // バックアップ：テキスト表示（iPad Safari対応）
-  function doBackup(){
-    const data = { players, pin, exportedAt: new Date().toISOString(), version: STORAGE_KEY };
-    const json = JSON.stringify(data);
-    // まずダウンロード試みる（PC・Android）
-    try {
-      const blob = new Blob([json], { type:"application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `mainichiCollection_backup.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch(_) {}
-    // iPad用：テキストエリアにも表示
-    setBackupText(json);
-    setBackupCopied(false);
-  }
-
-  function doCopyBackup(){
-    if(!backupText) return;
-    navigator.clipboard.writeText(backupText).then(()=>{
-      setBackupCopied(true);
-      setTimeout(()=>setBackupCopied(false),2000);
-    }).catch(()=>{
-      // clipboard APIが使えない場合はselect
-      const ta = document.getElementById("backupTextArea");
-      if(ta){ ta.select(); document.execCommand("copy"); setBackupCopied(true); setTimeout(()=>setBackupCopied(false),2000); }
-    });
-  }
-
-  // 復元：テキスト貼り付けorファイル
-  function doRestoreFromText(text){
-    try {
-      const data = JSON.parse(text);
-      if(!data.players || !data.pin){ setRestoreMsg("❌ ファイルがただしくありません"); return; }
-      setPlayers(data.players);
-      setPin(data.pin);
-      saveStorage({ players: data.players, pin: data.pin });
-      setRestoreMsg("✅ データをふっげんしました！");
-      setBackupText("");
-      setTimeout(()=>setRestoreMsg(""),3000);
-    } catch {
-      setRestoreMsg("❌ よみこみにしっぱいしました");
-      setTimeout(()=>setRestoreMsg(""),3000);
-    }
-  }
-
-  function doRestore(e){
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = evt => doRestoreFromText(evt.target.result);
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
   const doneTasks=player.tasks.filter(t=>t.done).length;
   const totalTasks=player.tasks.length;
   const collected=Object.keys(player.collection).length;
@@ -719,9 +814,6 @@ export default function App() {
   const canGacha=canGachaCount>0;
   const srBoosted=player.consecutiveDupe>=2;
 
-  // ============================================================
-  // SETUP SCREEN
-  // ============================================================
   if(screen==="setup") return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#FFF8E1,#E3F2FD)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"'Kosugi Maru',sans-serif",padding:24}}>
       <style>{GLOBAL_CSS}</style>
@@ -755,15 +847,11 @@ export default function App() {
     </div>
   );
 
-  // ============================================================
-  // MAIN SCREEN
-  // ============================================================
   return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#FFF8E1,#E3F2FD)",fontFamily:"'Kosugi Maru',sans-serif",paddingBottom:80}}>
       <style>{GLOBAL_CSS}</style>
       <Floaters items={floaters}/>
 
-      {/* HEADER */}
       <div style={{background:"linear-gradient(90deg,#5BC8E8,#4ECDC4)",padding:"12px 14px 14px",borderRadius:"0 0 22px 22px",boxShadow:"0 4px 18px rgba(0,0,0,0.10)"}}>
         <div style={{display:"flex",gap:6,marginBottom:10}}>
           {players.map((p,i)=>(
@@ -790,7 +878,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* TABS */}
       <div style={{display:"flex",gap:8,padding:"10px 14px 0"}}>
         {[["todo","📋 やること"],["gacha","🎰 ガチャ"],["zukan","📖 ずかん"]].map(([key,label])=>(
           <button key={key} onClick={()=>setTab(key)} style={{flex:1,padding:"10px 0",borderRadius:13,border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:12,background:tab===key?"#FF8C00":"white",color:tab===key?"white":"#aaa",boxShadow:tab===key?"0 3px 12px #ff8c0033":"0 1px 4px #0001",transition:"all 0.2s"}}>{label}</button>
@@ -798,8 +885,6 @@ export default function App() {
       </div>
 
       <div style={{padding:"12px 14px",maxWidth:480,margin:"0 auto"}}>
-
-        {/* TODO */}
         {tab==="todo"&&(
           <>
             {player.tasks.length===0?(
@@ -829,7 +914,6 @@ export default function App() {
           </>
         )}
 
-        {/* GACHA */}
         {tab==="gacha"&&(
           <div style={{textAlign:"center",paddingTop:8}}>
             {srBoosted&&(
@@ -842,32 +926,14 @@ export default function App() {
                 <span style={{fontSize:20}}>✨</span>
               </div>
             )}
-
             <div style={{fontSize:12,color:"#ccc",marginBottom:4}}>
               SR確率：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　R：<b style={{color:"#4A90E2"}}>20%</b>　チケット：<b style={{color:"#FF8C00"}}>🎟️{player.tickets||0}</b>
             </div>
-
-            {/* カプセルアニメ or ひくボタン */}
             {gachaReady?(
-              <GachaCapsuleAnimation
-                key={gachaKey}
-                resultRarity={gachaPending?.rarity||"N"}
-                resultChar={gachaPending}
-                consecutiveDupe={player.consecutiveDupe}
-                onComplete={onGachaComplete}
-              />
+              <GachaCapsuleAnimation key={gachaKey} resultRarity={gachaPending?.rarity||"N"} resultChar={gachaPending} consecutiveDupe={player.consecutiveDupe} onComplete={onGachaComplete}/>
             ):(
               <>
-                <button onClick={doGacha} disabled={!canGacha} style={{
-                  marginTop:24,
-                  background:canGacha?"linear-gradient(135deg,#FF6B6B,#FFD700)":"#eee",
-                  border:"none",borderRadius:99,padding:"16px 44px",
-                  fontFamily:"inherit",fontWeight:900,fontSize:18,
-                  color:canGacha?"white":"#bbb",
-                  cursor:canGacha?"pointer":"not-allowed",
-                  boxShadow:canGacha?srBoosted?"0 4px 24px #F5A62366":"0 4px 18px #FF6B6B44":"none",
-                  transition:"all 0.2s",
-                }}>
+                <button onClick={doGacha} disabled={!canGacha} style={{marginTop:24,background:canGacha?"linear-gradient(135deg,#FF6B6B,#FFD700)":"#eee",border:"none",borderRadius:99,padding:"16px 44px",fontFamily:"inherit",fontWeight:900,fontSize:18,color:canGacha?"white":"#bbb",cursor:canGacha?"pointer":"not-allowed",boxShadow:canGacha?srBoosted?"0 4px 24px #F5A62366":"0 4px 18px #FF6B6B44":"none",transition:"all 0.2s"}}>
                   🎰 ガチャをひく！（{GACHA_COST}pt or 🎟️）
                 </button>
                 {!canGacha&&<div style={{marginTop:14,color:"#FFB347",fontWeight:700,fontSize:13}}>タスクをこなしてポイントをためよう！</div>}
@@ -876,14 +942,22 @@ export default function App() {
           </div>
         )}
 
-        {/* ZUKAN */}
         {tab==="zukan"&&(
           <>
             <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
               {GENRES.map(g=>{
                 const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
                 return(
-                  <button key={g.id} onClick={()=>g.active&&setZukanGenre(g.id)} style={{flexShrink:0,padding:"8px 10px",borderRadius:12,border:"none",background:!g.active?"#f0f0f0":zukanGenre===g.id?g.color:"white",color:!g.active?"#ccc":zukanGenre===g.id?"white":"#aaa",fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:g.active?"pointer":"default",transition:"all 0.2s",boxShadow:zukanGenre===g.id?`0 3px 10px ${g.color}55`:"0 1px 4px #0001",textAlign:"center"}}>
+                  <button key={g.id} onClick={()=>{
+                      if(!g.active) return;
+                      setZukanGenre(g.id);
+                      // 図鑑タブでコンプリート認定証を再表示
+                      if(cnt===30 && !shownCerts[g.id]) {
+                        setCertModal({genreId:g.id,genreName:g.name,genreEmoji:g.emoji});
+                        setShownCerts(prev=>({...prev,[g.id]:true}));
+                      }
+                    }} style={{flexShrink:0,padding:"8px 10px",borderRadius:12,border:"none",background:!g.active?"#f0f0f0":zukanGenre===g.id?g.color:"white",color:!g.active?"#ccc":zukanGenre===g.id?"white":"#aaa",fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:g.active?"pointer":"default",transition:"all 0.2s",boxShadow:zukanGenre===g.id?`0 3px 10px ${g.color}55`:"0 1px 4px #0001",textAlign:"center",position:"relative"}}>
+                    {cnt===30&&g.active&&<div style={{position:"absolute",top:-6,right:-6,background:"#FFD700",borderRadius:"50%",width:18,height:18,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 6px #FFD70088"}}>🏆</div>}
                     <div>{g.emoji}</div><div>{g.name}</div>
                     <div style={{fontSize:10}}>{g.active?`${cnt}/30`:"じゅんびちゅう"}</div>
                   </button>
@@ -902,7 +976,16 @@ export default function App() {
 
       {selectedChar&&<CharDetail char={selectedChar} count={player.collection[selectedChar.id]||0} onClose={()=>setSelectedChar(null)}/>}
 
-      {/* PARENT MODAL */}
+      {/* 認定証モーダル */}
+      {certModal&&(
+        <CertModal
+          genreId={certModal.genreId}
+          genreName={certModal.genreName}
+          genreEmoji={certModal.genreEmoji}
+          onClose={()=>setCertModal(null)}
+        />
+      )}
+
       {parentOpen&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:16}} onClick={e=>{if(e.target===e.currentTarget){setParentOpen(false);setParentAuth(false);}}}>
           <div style={{background:"white",borderRadius:"22px 22px 14px 14px",width:"100%",maxWidth:440,padding:22,maxHeight:"85vh",overflowY:"auto",animation:"popIn 0.3s ease"}}>
@@ -987,47 +1070,12 @@ export default function App() {
                       {pinChangeMsg&&<div style={{color:pinChangeMsg.startsWith("✅")?"#62C462":"#FF4757",fontSize:12,marginBottom:8}}>{pinChangeMsg}</div>}
                       <button onClick={changePin} style={{width:"100%",background:"#5BC8E8",border:"none",borderRadius:11,padding:10,fontFamily:"inherit",fontWeight:800,fontSize:14,color:"white",cursor:"pointer"}}>PINをかえる</button>
                     </div>
-                    <div style={{background:"#f9f9f9",borderRadius:14,padding:14,marginTop:14}}>
-                      <div style={{fontWeight:800,color:"#555",fontSize:13,marginBottom:6}}>💾 データのバックアップ・ふっげん</div>
-                      <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.7}}>キャッシュ削除でデータが消えるまえに保存しておこう！</div>
 
-                      {/* ① バックアップボタン */}
-                      <button onClick={doBackup} style={{width:"100%",background:"linear-gradient(135deg,#4CAF50,#2E7D32)",border:"none",borderRadius:11,padding:11,fontFamily:"inherit",fontWeight:800,fontSize:14,color:"white",cursor:"pointer",marginBottom:10}}>
-                        💾 バックアップをつくる
-                      </button>
+                    {/* ★ バックアップパネル（独立コンポーネント） */}
+                    <BackupPanel players={players} pin={pin} setPlayers={setPlayers} setPin={setPin}/>
 
-                      {/* ② バックアップテキスト表示（iPad用） */}
-                      {backupText&&(
-                        <div style={{marginBottom:12}}>
-                          <div style={{fontSize:11,color:"#888",marginBottom:6,lineHeight:1.6}}>
-                            📱 iPadの場合：下のテキストを全部コピーして<br/>メモアプリなどに保存してください
-                          </div>
-                          <textarea
-                            id="backupTextArea"
-                            readOnly
-                            value={backupText}
-                            style={{width:"100%",height:80,borderRadius:10,border:"2px solid #4CAF50",padding:8,fontSize:10,fontFamily:"monospace",resize:"none",boxSizing:"border-box",color:"#555",background:"#f0fff0"}}
-                          />
-                          <button onClick={doCopyBackup} style={{width:"100%",marginTop:6,background:backupCopied?"#62C462":"linear-gradient(135deg,#4CAF50,#2E7D32)",border:"none",borderRadius:10,padding:9,fontFamily:"inherit",fontWeight:800,fontSize:13,color:"white",cursor:"pointer"}}>
-                            {backupCopied?"✅ コピーしました！":"📋 テキストをコピー"}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* ③ 復元：ファイル or テキスト貼り付け */}
-                      <div style={{fontSize:11,color:"#aaa",marginBottom:8,textAlign:"center"}}>▼ データをふっげんする</div>
-                      <label style={{display:"block",width:"100%",background:"#f0f0f0",border:"2px dashed #ccc",borderRadius:11,padding:"10px",textAlign:"center",cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:13,color:"#aaa",boxSizing:"border-box",marginBottom:8}}>
-                        📂 ファイルをえらぶ（PC・Android）
-                        <input type="file" accept=".json,.txt" onChange={doRestore} style={{display:"none"}}/>
-                      </label>
-                      <div style={{fontSize:11,color:"#aaa",marginBottom:6,textAlign:"center"}}>または</div>
-                      <textarea
-                        placeholder="📋 バックアップのテキストをここに貼り付け（iPad用）"
-                        style={{width:"100%",height:70,borderRadius:10,border:"2px dashed #ccc",padding:8,fontSize:11,fontFamily:"monospace",resize:"none",boxSizing:"border-box",color:"#555"}}
-                        onBlur={e=>{ if(e.target.value.trim()) doRestoreFromText(e.target.value.trim()); }}
-                      />
-                      {restoreMsg&&<div style={{color:restoreMsg.startsWith("✅")?"#62C462":"#FF4757",fontSize:13,marginTop:8,textAlign:"center",fontWeight:700}}>{restoreMsg}</div>}
-                    </div>
+                    {/* 全リセット */}
+                    <ResetPanel players={players} current={current} setPlayers={setPlayers} setPin={setPin} setParentOpen={setParentOpen} setParentAuth={setParentAuth} setupPin={pin}/>
                   </>
                 )}
               </>
@@ -1038,4 +1086,11 @@ export default function App() {
     </div>
   );
 }
-// test
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(()=>console.log("PWA Ready"))
+      .catch(err=>console.error(err));
+  });
+}
