@@ -481,9 +481,16 @@ function CertModal({ genreId, genreName, genreEmoji, onClose }) {
   );
 }
 
-function PinModal({ onSuccess, onClose, correctPin }) {
+const DEBUG_CODE = "00012345";
+const DEBUG_DURATION = 30 * 60 * 1000; // 30分
+
+function PinModal({ onSuccess, onClose, correctPin, onDebug }) {
   const [val,setVal]=useState(""); const [err,setErr]=useState(false);
-  function check(){ if(val===correctPin){onSuccess();}else{setErr(true);setVal("");} }
+  function check(){
+    if(val===correctPin){ onSuccess(); }
+    else if(val===DEBUG_CODE){ onDebug&&onDebug(); onClose(); }
+    else{ setErr(true); setVal(""); }
+  }
   return(
     <div style={{textAlign:"center"}}>
       <div style={{fontSize:40,marginBottom:8}}>🔐</div>
@@ -720,6 +727,9 @@ export default function App() {
   const [zukanGenre,setZukanGenre]=useState("umiu");
   const [gachaGenre,setGachaGenre]=useState("all"); // "all" or genreId
   const [certView,setCertView]=useState(null); // にんていしょうタブで選択中
+  const [debugMode,setDebugMode]=useState(false); // デバッグモード
+  const [debugExpiry,setDebugExpiry]=useState(null); // 有効期限タイムスタンプ
+  const [debugRemain,setDebugRemain]=useState(0); // 残り秒数
   const [selectedChar,setSelectedChar]=useState(null);
   const [floaters,setFloaters]=useState([]);
   const fxId=useRef(0);
@@ -731,6 +741,28 @@ export default function App() {
   }
 
   useEffect(()=>{ if(players.length>0) saveStorage({players,pin}); },[players,pin]);
+
+  // デバッグモードカウントダウン
+  useEffect(()=>{
+    if(!debugMode) return;
+    const interval = setInterval(()=>{
+      const remain = Math.max(0, Math.round((debugExpiry - Date.now()) / 1000));
+      setDebugRemain(remain);
+      if(remain <= 0){
+        setDebugMode(false);
+        setDebugExpiry(null);
+        setDebugRemain(0);
+      }
+    }, 1000);
+    return ()=>clearInterval(interval);
+  },[debugMode, debugExpiry]);
+
+  function activateDebug(){
+    const expiry = Date.now() + DEBUG_DURATION;
+    setDebugMode(true);
+    setDebugExpiry(expiry);
+    setDebugRemain(DEBUG_DURATION / 1000);
+  }
   useEffect(()=>{
     if(players.length===0) return;
     const today=todayStr();
@@ -760,17 +792,33 @@ export default function App() {
 
   function completeTask(taskId,e){
     const task=player.tasks.find(t=>t.id===taskId);
-    if(!task||task.done) return;
+    if(!task) return;
     const rect=e.currentTarget.getBoundingClientRect();
-    addFloater(rect.left+rect.width/2,rect.top,"⭐");
-    setPlayers(prev=>prev.map((p,i)=>{
-      if(i!==current) return p;
-      const tasks=p.tasks.map(t=>t.id===taskId?{...t,done:true}:t);
-      const allDone=tasks.every(t=>t.done),prevAllDone=p.tasks.every(t=>t.done);
-      const bonus=(allDone&&!prevAllDone)?CLEAR_BONUS:0;
-      if(bonus>0) setTimeout(()=>addFloater(rect.left+rect.width/2,rect.top-30,"🎉"),300);
-      return{...p,tasks,points:p.points+TASK_PT+bonus};
-    }));
+
+    if(!task.done){
+      // チェックON
+      addFloater(rect.left+rect.width/2,rect.top,"⭐");
+      setPlayers(prev=>prev.map((p,i)=>{
+        if(i!==current) return p;
+        const tasks=p.tasks.map(t=>t.id===taskId?{...t,done:true}:t);
+        const allDone=tasks.every(t=>t.done),prevAllDone=p.tasks.every(t=>t.done);
+        const bonus=(allDone&&!prevAllDone)?CLEAR_BONUS:0;
+        if(bonus>0) setTimeout(()=>addFloater(rect.left+rect.width/2,rect.top-30,"🎉"),300);
+        return{...p,tasks,points:p.points+TASK_PT+bonus};
+      }));
+    } else {
+      // チェックOFF（ポイント返却）
+      setPlayers(prev=>prev.map((p,i)=>{
+        if(i!==current) return p;
+        const wasAllDone=p.tasks.every(t=>t.done);
+        const tasks=p.tasks.map(t=>t.id===taskId?{...t,done:false}:t);
+        // 全クリボーナスを受け取っていた場合は返却
+        const bonusReturn=wasAllDone?CLEAR_BONUS:0;
+        // ポイントが足りる場合のみ減点（マイナスにしない）
+        const deduct=Math.min(TASK_PT+bonusReturn, p.points);
+        return{...p,tasks,points:p.points-deduct};
+      }));
+    }
   }
   function addTaskParent(){ if(!newTask.trim()) return; updatePlayer(current,p=>({...p,tasks:[...p.tasks,{id:Date.now(),text:newTask.trim(),done:false}]})); setNewTask(""); }
   function removeTask(id){ updatePlayer(current,p=>({...p,tasks:p.tasks.filter(t=>t.id!==id)})); }
@@ -785,16 +833,17 @@ export default function App() {
   }
 
   function doGacha(){
+    if(gachaReady) return;
     const canUseTicket=(player.tickets||0)>0;
     const canUsePt=player.points>=GACHA_COST;
-    if(!canUseTicket&&!canUsePt) return;
-    if(gachaReady) return;
+    // デバッグモード中はポイント・チケット不要
+    if(!debugMode && !canUseTicket && !canUsePt) return;
     const completedGenres = getCompletedGenres(player.collection);
     // ガチャジャンル選択反映（allの場合はコンプリート除外のみ）
     const result = rollGachaFiltered(player.consecutiveDupe, completedGenres, gachaGenre);
     const isNew=!player.collection[result.id];
     updatePlayer(current,p=>{
-      const usedTicket=(p.tickets||0)>0;
+      const usedTicket=!debugMode&&(p.tickets||0)>0;
       const isSR=result.rarity==="SR";
       const wasDupe=!!p.collection[result.id];
       const newConsecutiveDupe=isSR?0:(wasDupe?(p.consecutiveDupe||0)+1:0);
@@ -809,7 +858,13 @@ export default function App() {
           setShownCerts(prev=>({...prev,[genreId]:true}));
         }, 2200); // ポップアップ後に表示
       }
-      return{...p,points:usedTicket?p.points:p.points-GACHA_COST,tickets:usedTicket?(p.tickets||0)-1:(p.tickets||0),collection:newCollection,consecutiveDupe:newConsecutiveDupe};
+      return{
+        ...p,
+        points: debugMode ? p.points : (usedTicket ? p.points : p.points - GACHA_COST),
+        tickets: debugMode ? (p.tickets||0) : (usedTicket ? (p.tickets||0)-1 : (p.tickets||0)),
+        collection: newCollection,
+        consecutiveDupe: newConsecutiveDupe,
+      };
     });
     setGachaPending({...result,isNew});
     setGachaKey(k=>k+1);
@@ -839,7 +894,7 @@ export default function App() {
   const collected=Object.keys(player.collection).length;
   const totalActive=ACTIVE_CHARS.length;
   const canGachaCount=Math.floor(player.points/GACHA_COST)+(player.tickets||0);
-  const canGacha=canGachaCount>0;
+  const canGacha=debugMode || canGachaCount>0;
   const srBoosted=player.consecutiveDupe>=2;
 
   if(screen==="setup") return(
@@ -880,7 +935,28 @@ export default function App() {
       <style>{GLOBAL_CSS}</style>
       <Floaters items={floaters}/>
 
-      <div style={{background:"linear-gradient(90deg,#5BC8E8,#4ECDC4)",padding:"12px 14px 14px",borderRadius:"0 0 22px 22px",boxShadow:"0 4px 18px rgba(0,0,0,0.10)"}}>
+      {/* デバッグモードバナー */}
+      {debugMode&&(
+        <div style={{
+          background:"linear-gradient(90deg,#2d2d2d,#1a1a2e)",
+          padding:"6px 14px",
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+        }}>
+          <div style={{color:"#00ff88",fontWeight:900,fontSize:12,fontFamily:"monospace"}}>
+            🔧 DEBUGモード ON
+          </div>
+          <div style={{color:"#ffcc00",fontWeight:700,fontSize:12,fontFamily:"monospace"}}>
+            ⏱ {Math.floor(debugRemain/60)}:{String(debugRemain%60).padStart(2,"0")}
+          </div>
+          <button onClick={()=>{setDebugMode(false);setDebugExpiry(null);setDebugRemain(0);}} style={{
+            background:"#ff4444",border:"none",borderRadius:6,
+            padding:"3px 8px",color:"white",fontWeight:900,fontSize:11,cursor:"pointer"
+          }}>終了</button>
+        </div>
+      )}
+      <div style={{background:"linear-gradient(90deg,#5BC8E8,#4ECDC4)",padding:"12px 14px 14px",borderRadius:"0 0 22px 22px",boxShadow:"0 4px 18px rgba(0,0,0,0.10)"
+      ,borderRadius:debugMode?"0 0 22px 22px":"0 0 22px 22px"
+      }}>
         <div style={{display:"flex",gap:6,marginBottom:10}}>
           {players.map((p,i)=>(
             <button key={i} onClick={()=>{setCurrent(i);setGachaReady(false);setGachaPending(null);}} style={{flex:1,padding:"7px 4px",borderRadius:12,border:"none",background:i===current?"white":"rgba(255,255,255,0.3)",color:i===current?"#333":"white",fontFamily:"inherit",fontWeight:800,fontSize:13,cursor:"pointer",transition:"all 0.2s"}}>{p.name}</button>
@@ -924,17 +1000,17 @@ export default function App() {
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div style={{fontSize:12,color:"#aaa",fontWeight:700}}>{doneTasks===totalTasks&&totalTasks>0?`🎉 ぜんぶおわった！+${CLEAR_BONUS}pt ボーナス！`:`あと ${totalTasks-doneTasks}こ！`}</div>
-                  <button onClick={resetTasks} style={{background:"#f5f5f5",border:"none",borderRadius:99,padding:"4px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit",color:"#bbb"}}>リセット</button>
+
                 </div>
                 <div style={{background:"#eee",borderRadius:99,height:8,marginBottom:12,overflow:"hidden"}}>
                   <div style={{width:totalTasks>0?`${(doneTasks/totalTasks)*100}%`:"0%",height:"100%",background:"linear-gradient(90deg,#78D878,#FFD700)",borderRadius:99,transition:"width 0.5s ease"}}/>
                 </div>
                 {player.tasks.map(task=>(
-                  <button key={task.id} onClick={e=>completeTask(task.id,e)} disabled={task.done}
-                    style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:task.done?"#F1F8F1":"white",border:`2px solid ${task.done?"#78D878":"#FFE082"}`,borderRadius:15,padding:"13px 14px",marginBottom:8,cursor:task.done?"default":"pointer",fontFamily:"inherit",fontSize:15,fontWeight:700,color:task.done?"#78D878":"#333",textAlign:"left",transition:"all 0.15s",boxShadow:task.done?"none":"0 2px 8px #ffd70018"}}>
+                  <button key={task.id} onClick={e=>completeTask(task.id,e)}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:task.done?"#F1F8F1":"white",border:`2px solid ${task.done?"#78D878":"#FFE082"}`,borderRadius:15,padding:"13px 14px",marginBottom:8,cursor:"pointer",fontFamily:"inherit",fontSize:15,fontWeight:700,color:task.done?"#78D878":"#333",textAlign:"left",transition:"all 0.15s",boxShadow:task.done?"none":"0 2px 8px #ffd70018"}}>
                     <span style={{fontSize:22}}>{task.done?"✅":"⬜"}</span>
                     <span style={{flex:1}}>{task.text}</span>
-                    <span style={{fontSize:11,color:task.done?"#b2dfb2":"#FFB74D",fontWeight:700}}>+{TASK_PT}pt</span>
+                    <span style={{fontSize:11,color:task.done?"#e07777":"#FFB74D",fontWeight:700}}>{task.done?"もどす":"+" + TASK_PT + "pt"}</span>
                   </button>
                 ))}
               </>
@@ -1003,6 +1079,14 @@ export default function App() {
               </div>
             )}
 
+            {debugMode&&(
+              <div style={{
+                background:"#1a1a2e",borderRadius:10,padding:"6px 12px",
+                marginBottom:8,fontFamily:"monospace",fontSize:11,color:"#00ff88",fontWeight:700
+              }}>
+                🔧 デバッグモード：ガチャ無制限 ⏱{Math.floor(debugRemain/60)}:{String(debugRemain%60).padStart(2,"0")}
+              </div>
+            )}
             <div style={{fontSize:11,color:"#ccc",marginBottom:4}}>
               SR：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　R：<b style={{color:"#4A90E2"}}>20%</b>　🎟️{player.tickets||0}
             </div>
@@ -1145,7 +1229,7 @@ export default function App() {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:16}} onClick={e=>{if(e.target===e.currentTarget){setParentOpen(false);setParentAuth(false);}}}>
           <div style={{background:"white",borderRadius:"22px 22px 14px 14px",width:"100%",maxWidth:440,padding:22,maxHeight:"85vh",overflowY:"auto",animation:"popIn 0.3s ease"}}>
             {!parentAuth?(
-              <PinModal correctPin={pin} onSuccess={()=>{setParentAuth(true);setParentTab("tasks");setNewPin("");setNewPin2("");setPinChangeMsg("");setEditNames(players.map(p=>p.name));setEditCount(players.length);setBonusType("pt");}} onClose={()=>setParentOpen(false)}/>
+              <PinModal correctPin={pin} onSuccess={()=>{setParentAuth(true);setParentTab("tasks");setNewPin("");setNewPin2("");setPinChangeMsg("");setEditNames(players.map(p=>p.name));setEditCount(players.length);setBonusType("pt");}} onClose={()=>setParentOpen(false)} onDebug={activateDebug}/>
             ):(
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
