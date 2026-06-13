@@ -166,29 +166,44 @@ function getCertImage(genreId) {
   return `/images/cert_${genreId}.png`;
 }
 // ジャンル選択対応ガチャ
-function rollGachaFiltered(consecutiveDupe, completedGenres=[], selectedGenre="all") {
+// 未入手5倍・入手済み1倍の重み付き抽選
+function weightedPick(chars, collection) {
+  const WEIGHT_NEW = 5;
+  const WEIGHT_HAVE = 1;
+  const weighted = [];
+  for (const c of chars) {
+    const w = collection[c.id] ? WEIGHT_HAVE : WEIGHT_NEW;
+    for (let i = 0; i < w; i++) weighted.push(c);
+  }
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+
+function rollGachaFiltered(consecutiveDupe, completedGenres=[], selectedGenre="all", collection={}) {
   const r = Math.random();
   const srRate = consecutiveDupe >= 2 ? 0.15 : 0.075;
   const rarity = r < srRate ? "SR" : r < srRate + 0.20 ? "R" : "N";
-  let pool;
+
+  let candidates;
   if (selectedGenre === "all") {
-    // 全ジャンル：コンプリート済みを除外
-    pool = ACTIVE_CHARS.filter(c =>
+    // 全ジャンル：コンプリート済みジャンルを除外
+    candidates = ACTIVE_CHARS.filter(c =>
       c.rarity === rarity &&
       !completedGenres.includes(c.id.split("_")[0])
     );
   } else {
-    // 特定ジャンル：未取得を優先、全部持ってたら重複も可
-    const genreChars = ACTIVE_CHARS.filter(c =>
+    // 特定ジャンル
+    candidates = ACTIVE_CHARS.filter(c =>
       c.rarity === rarity && c.id.startsWith(selectedGenre)
     );
-    pool = genreChars;
   }
-  // フォールバック
-  if (pool.length === 0) {
-    pool = ACTIVE_CHARS.filter(c => c.rarity === rarity);
+
+  // フォールバック（候補が空の場合）
+  if (candidates.length === 0) {
+    candidates = ACTIVE_CHARS.filter(c => c.rarity === rarity);
   }
-  return pool[Math.floor(Math.random() * pool.length)];
+
+  // 未入手5倍・入手済み1倍の重み付き抽選
+  return weightedPick(candidates, collection);
 }
 function getGenreEmoji(charId) {
   const g = GENRES.find(g => charId.startsWith(g.id));
@@ -214,6 +229,10 @@ const GLOBAL_CSS = `
   @keyframes charReveal{0%{transform:scale(0) rotate(-20deg);opacity:0}60%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1) rotate(0);opacity:1}}
   @keyframes sparkle{0%,100%{opacity:0;transform:scale(0)}50%{opacity:1;transform:scale(1)}}
   @keyframes srBoostPulse{0%,100%{box-shadow:0 0 0 0 #F5A62388}50%{box-shadow:0 0 14px 4px #F5A62344}}
+  @keyframes slideUp{0%{transform:translateY(100%);opacity:0}100%{transform:translateY(0);opacity:1}}
+  @keyframes slideDown{0%{transform:translateY(0);opacity:1}100%{transform:translateY(100%);opacity:0}}
+  @keyframes roomBgFade{0%{opacity:0}100%{opacity:1}}
+  @keyframes shopSignBounce{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
 `;
 
 function Floaters({ items }) {
@@ -726,6 +745,7 @@ export default function App() {
   const [shownCerts,setShownCerts]=useState({}); // 表示済み認定証（セッション中）
   const [zukanGenre,setZukanGenre]=useState("umiu");
   const [gachaGenre,setGachaGenre]=useState("all"); // "all" or genreId
+  const [gachaRoomOpen,setGachaRoomOpen]=useState(false); // ガチャ物屋ポップアップ
   const [certView,setCertView]=useState(null); // にんていしょうタブで選択中
   const [debugMode,setDebugMode]=useState(false); // デバッグモード
   const [debugExpiry,setDebugExpiry]=useState(null); // 有効期限タイムスタンプ
@@ -840,7 +860,7 @@ export default function App() {
     if(!debugMode && !canUseTicket && !canUsePt) return;
     const completedGenres = getCompletedGenres(player.collection);
     // ガチャジャンル選択反映（allの場合はコンプリート除外のみ）
-    const result = rollGachaFiltered(player.consecutiveDupe, completedGenres, gachaGenre);
+    const result = rollGachaFiltered(player.consecutiveDupe, completedGenres, gachaGenre, player.collection);
     const isNew=!player.collection[result.id];
     updatePlayer(current,p=>{
       const usedTicket=!debugMode&&(p.tickets||0)>0;
@@ -1019,87 +1039,104 @@ export default function App() {
         )}
 
         {tab==="gacha"&&(
-          <div style={{textAlign:"center",paddingTop:8}}>
+          <div style={{paddingTop:8}}>
+            {/* SR確率アップバナー */}
             {srBoosted&&(
-              <div style={{background:"linear-gradient(135deg,#FFF3C4,#FFE082)",border:"2px solid #F5A623",borderRadius:14,padding:"10px 16px",marginBottom:10,animation:"srBoostPulse 1.5s ease infinite",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                <span style={{fontSize:20}}>✨</span>
-                <div>
+              <div style={{background:"linear-gradient(135deg,#FFF3C4,#FFE082)",border:"2px solid #F5A623",borderRadius:14,padding:"10px 16px",marginBottom:12,animation:"srBoostPulse 1.5s ease infinite",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{fontSize:18}}>✨</span>
+                <div style={{textAlign:"center"}}>
                   <div style={{fontWeight:900,color:"#B8720A",fontSize:13}}>SR確率２倍アップ中！</div>
                   <div style={{fontSize:11,color:"#C8860A"}}>ダブりが{player.consecutiveDupe}回つづいてるよ</div>
                 </div>
-                <span style={{fontSize:20}}>✨</span>
-              </div>
-            )}
-
-            {/* カテゴリ選択 */}
-            {!gachaReady&&(
-              <div style={{marginBottom:8}}>
-                <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:700}}>ガチャするカテゴリをえらぼう</div>
-                <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4,justifyContent:"center",flexWrap:"wrap"}}>
-                  {/* 全部ボタン */}
-                  <button onClick={()=>setGachaGenre("all")} style={{
-                    flexShrink:0,padding:"6px 10px",borderRadius:99,border:"none",
-                    background:gachaGenre==="all"?"#FF8C00":"#f5f5f5",
-                    color:gachaGenre==="all"?"white":"#888",
-                    fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
-                    transition:"all 0.2s",
-                  }}>🎲 全部</button>
-                  {/* 各ジャンルボタン */}
-                  {GENRES.filter(g=>g.active).map(g=>{
-                    const cnt = CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
-                    const isComplete = cnt === 30;
-                    const isSelected = gachaGenre === g.id;
-                    return(
-                      <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
-                        flexShrink:0,padding:"6px 10px",borderRadius:99,border:"none",
-                        background:isSelected?g.color:isComplete?"#f9f0ff":"#f5f5f5",
-                        color:isSelected?"white":isComplete?g.color:"#888",
-                        fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
-                        transition:"all 0.2s",
-                        border:isComplete?`1.5px solid ${g.color}`:"1.5px solid transparent",
-                        position:"relative",
-                      }}>
-                        {g.emoji} {g.name}
-                        {isComplete&&<span style={{marginLeft:3}}>🏆</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* 選択中ジャンルの進捗 */}
-                {gachaGenre!=="all"&&(()=>{
-                  const g = GENRES.find(x=>x.id===gachaGenre);
-                  const cnt = CHARACTERS[gachaGenre].filter(c=>player.collection[c.id]).length;
-                  return g ? (
-                    <div style={{fontSize:11,color:"#aaa",marginTop:4}}>
-                      {g.emoji} {g.name}：<b style={{color:cnt===30?"#FFD700":g.color}}>{cnt}/30</b>
-                      {cnt===30&&<span style={{color:"#FFD700",marginLeft:4}}>コンプリート！🎉</span>}
-                    </div>
-                  ) : null;
-                })()}
+                <span style={{fontSize:18}}>✨</span>
               </div>
             )}
 
             {debugMode&&(
-              <div style={{
-                background:"#1a1a2e",borderRadius:10,padding:"6px 12px",
-                marginBottom:8,fontFamily:"monospace",fontSize:11,color:"#00ff88",fontWeight:700
-              }}>
+              <div style={{background:"#1a1a2e",borderRadius:10,padding:"6px 12px",marginBottom:10,fontFamily:"monospace",fontSize:11,color:"#00ff88",fontWeight:700,textAlign:"center"}}>
                 🔧 デバッグモード：ガチャ無制限 ⏱{Math.floor(debugRemain/60)}:{String(debugRemain%60).padStart(2,"0")}
               </div>
             )}
-            <div style={{fontSize:11,color:"#ccc",marginBottom:4}}>
-              SR：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　R：<b style={{color:"#4A90E2"}}>20%</b>　🎟️{player.tickets||0}
+
+            {/* カテゴリ選択 */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,color:"#aaa",marginBottom:8,fontWeight:700,textAlign:"center"}}>🎲 ガチャするカテゴリをえらぼう</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+                <button onClick={()=>setGachaGenre("all")} style={{
+                  padding:"10px 16px",borderRadius:14,border:"none",
+                  background:gachaGenre==="all"?"linear-gradient(135deg,#FF8C00,#FFD700)":"white",
+                  color:gachaGenre==="all"?"white":"#888",
+                  fontFamily:"inherit",fontWeight:800,fontSize:12,cursor:"pointer",
+                  boxShadow:gachaGenre==="all"?"0 3px 12px #FF8C0044":"0 1px 4px #0001",
+                  transition:"all 0.2s",
+                }}>🎲 ぜんぶ</button>
+                {GENRES.filter(g=>g.active).map(g=>{
+                  const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
+                  const isComplete=cnt===30;
+                  const isSelected=gachaGenre===g.id;
+                  return(
+                    <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
+                      padding:"10px 14px",borderRadius:14,border:"none",
+                      background:isSelected?`linear-gradient(135deg,${g.color},${g.color}cc)`:"white",
+                      color:isSelected?"white":"#666",
+                      fontFamily:"inherit",fontWeight:800,fontSize:12,cursor:"pointer",
+                      boxShadow:isSelected?`0 3px 12px ${g.color}55`:"0 1px 4px #0001",
+                      border:isComplete&&!isSelected?`2px solid ${g.color}`:"2px solid transparent",
+                      transition:"all 0.2s",
+                    }}>
+                      {g.emoji} {g.name}{isComplete?" 🏆":""}
+                    </button>
+                  );
+                })}
+              </div>
+              {gachaGenre!=="all"&&(()=>{
+                const g=GENRES.find(x=>x.id===gachaGenre);
+                const cnt=CHARACTERS[gachaGenre]?.filter(c=>player.collection[c.id]).length||0;
+                return g?(
+                  <div style={{textAlign:"center",fontSize:11,color:"#aaa",marginTop:6}}>
+                    {g.emoji} {g.name}：<b style={{color:cnt===30?"#FFD700":g.color}}>{cnt}/30</b>
+                    {cnt===30&&<span style={{color:"#FFD700",marginLeft:4}}>コンプリート！🎉</span>}
+                  </div>
+                ):null;
+              })()}
             </div>
-            {gachaReady?(
-              <GachaCapsuleAnimation key={gachaKey} resultRarity={gachaPending?.rarity||"N"} resultChar={gachaPending} consecutiveDupe={player.consecutiveDupe} onComplete={onGachaComplete}/>
-            ):(
-              <>
-                <button onClick={doGacha} disabled={!canGacha} style={{marginTop:16,background:canGacha?"linear-gradient(135deg,#FF6B6B,#FFD700)":"#eee",border:"none",borderRadius:99,padding:"16px 44px",fontFamily:"inherit",fontWeight:900,fontSize:18,color:canGacha?"white":"#bbb",cursor:canGacha?"pointer":"not-allowed",boxShadow:canGacha?srBoosted?"0 4px 24px #F5A62366":"0 4px 18px #FF6B6B44":"none",transition:"all 0.2s"}}>
-                  🎰 ガチャをひく！（{GACHA_COST}pt or 🎟️）
-                </button>
-                {!canGacha&&<div style={{marginTop:14,color:"#FFB347",fontWeight:700,fontSize:13}}>タスクをこなしてポイントをためよう！</div>}
-              </>
-            )}
+
+            {/* ガチャ情報 */}
+            <div style={{textAlign:"center",fontSize:11,color:"#ccc",marginBottom:16}}>
+              SR：<b style={{color:srBoosted?"#F5A623":"#aaa"}}>{srBoosted?"15%":"7.5%"}</b>　
+              R：<b style={{color:"#4A90E2"}}>20%</b>　
+              ポイント：<b style={{color:"#FF8C00"}}>{player.points}pt</b>　
+              🎟️<b style={{color:"#FF8C00"}}>{player.tickets||0}</b>
+            </div>
+
+            {/* ガチャ物屋へ入るボタン */}
+            <div style={{textAlign:"center"}}>
+              <button
+                onClick={()=>{ if(canGacha) setGachaRoomOpen(true); }}
+                disabled={!canGacha}
+                style={{
+                  background:canGacha
+                    ?"linear-gradient(135deg,#FF6B6B,#FFD700)"
+                    :"#eee",
+                  border:"none",borderRadius:20,
+                  padding:"20px 40px",
+                  fontFamily:"inherit",fontWeight:900,fontSize:20,
+                  color:canGacha?"white":"#bbb",
+                  cursor:canGacha?"pointer":"not-allowed",
+                  boxShadow:canGacha
+                    ? srBoosted?"0 6px 28px #F5A62366":"0 6px 24px #FF6B6B55"
+                    :"none",
+                  transition:"all 0.2s",
+                  letterSpacing:1,
+                }}>
+                🎰 ガチャをひきに行く！
+              </button>
+              {!canGacha&&(
+                <div style={{marginTop:12,color:"#FFB347",fontWeight:700,fontSize:13}}>
+                  タスクをこなしてポイントをためよう！
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1214,6 +1251,161 @@ export default function App() {
       )}
 
       {selectedChar&&<CharDetail char={selectedChar} count={player.collection[selectedChar.id]||0} onClose={()=>setSelectedChar(null)}/>}
+
+      {/* ガチャ物屋ポップアップ */}
+      {gachaRoomOpen&&(
+        <div style={{
+          position:"fixed",inset:0,zIndex:2500,
+          background:"linear-gradient(160deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
+          animation:"roomBgFade 0.4s ease",
+          display:"flex",flexDirection:"column",
+          fontFamily:"'Kosugi Maru',sans-serif",
+        }}>
+          {/* 物屋ヘッダー */}
+          <div style={{
+            padding:"14px 16px 10px",
+            background:"rgba(0,0,0,0.3)",
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+          }}>
+            <button onClick={()=>{
+              if(!gachaReady){ setGachaRoomOpen(false); setGachaPending(null); }
+            }} style={{
+              background:"rgba(255,255,255,0.15)",border:"none",borderRadius:99,
+              padding:"8px 16px",color:"white",fontFamily:"inherit",
+              fontWeight:800,fontSize:13,cursor:"pointer",
+            }}>← もどる</button>
+
+            <div style={{textAlign:"center"}}>
+              <div style={{
+                fontSize:14,fontWeight:900,color:"white",
+                animation:"shopSignBounce 2s ease-in-out infinite",
+                display:"inline-block",
+              }}>🎪 ガチャ物屋</div>
+              {(()=>{
+                const g = gachaGenre==="all" ? null : GENRES.find(x=>x.id===gachaGenre);
+                return g ? (
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>
+                    {g.emoji} {g.name}
+                  </div>
+                ) : (
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>🎲 ぜんぶ</div>
+                );
+              })()}
+            </div>
+
+            <div style={{
+              background:"rgba(255,255,255,0.15)",borderRadius:12,
+              padding:"6px 12px",textAlign:"center",
+            }}>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.6)"}}>のこり</div>
+              <div style={{fontWeight:900,color:"#FFD700",fontSize:13}}>
+                🎰{canGachaCount}
+              </div>
+            </div>
+          </div>
+
+          {/* 星の背景装飾 */}
+          <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden",zIndex:0}}>
+            {Array.from({length:20}).map((_,i)=>(
+              <div key={i} style={{
+                position:"absolute",
+                left:`${Math.random()*100}%`,
+                top:`${Math.random()*100}%`,
+                width:Math.random()*3+1,
+                height:Math.random()*3+1,
+                background:"white",
+                borderRadius:"50%",
+                opacity:Math.random()*0.6+0.2,
+                animation:`sparkle ${Math.random()*2+1}s ease-in-out infinite`,
+              }}/>
+            ))}
+          </div>
+
+          {/* ガチャエリア */}
+          <div style={{
+            flex:1,display:"flex",flexDirection:"column",
+            alignItems:"center",justifyContent:"center",
+            padding:24,position:"relative",zIndex:1,
+          }}>
+            {srBoosted&&(
+              <div style={{
+                background:"linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,140,0,0.2))",
+                border:"1px solid #FFD700",borderRadius:12,
+                padding:"6px 16px",marginBottom:16,
+                color:"#FFD700",fontWeight:800,fontSize:12,
+              }}>✨ SR確率２倍アップ中！</div>
+            )}
+
+            {/* カプセルアニメーションエリア */}
+            {gachaReady ? (
+              <GachaCapsuleAnimation
+                key={gachaKey}
+                resultRarity={gachaPending?.rarity||"N"}
+                resultChar={gachaPending}
+                consecutiveDupe={player.consecutiveDupe}
+                onComplete={()=>{ onGachaComplete(); }}
+              />
+            ) : (
+              <div style={{textAlign:"center"}}>
+                {/* 大きなガチャボタン */}
+                <div
+                  onClick={doGacha}
+                  style={{
+                    width:180,height:180,borderRadius:"50%",
+                    margin:"0 auto 24px",
+                    background:"radial-gradient(circle at 35% 35%,rgba(255,255,255,0.3),transparent 60%),linear-gradient(135deg,#FF6B6B,#FFD700)",
+                    boxShadow:srBoosted
+                      ?"0 0 0 4px #FFD70044, 0 12px 40px #F5A62366"
+                      :"0 0 0 4px rgba(255,255,255,0.1), 0 12px 40px #FF6B6B55",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:80,cursor:"pointer",userSelect:"none",
+                    transition:"transform 0.1s",
+                  }}
+                  onTouchStart={e=>e.currentTarget.style.transform="scale(0.95)"}
+                  onTouchEnd={e=>e.currentTarget.style.transform="scale(1)"}
+                >
+                  🎰
+                </div>
+
+                <div style={{color:"rgba(255,255,255,0.8)",fontSize:13,marginBottom:8}}>
+                  タップしてひく！
+                </div>
+                <div style={{color:"rgba(255,255,255,0.5)",fontSize:11}}>
+                  1回 = {GACHA_COST}pt または 🎟️1まい
+                </div>
+
+                {/* 連続で引くボタン */}
+                <button onClick={doGacha} style={{
+                  marginTop:20,
+                  background:"linear-gradient(135deg,#FF6B6B,#FFD700)",
+                  border:"none",borderRadius:99,padding:"14px 36px",
+                  fontFamily:"inherit",fontWeight:900,fontSize:16,
+                  color:"white",cursor:"pointer",
+                  boxShadow:"0 4px 20px #FF6B6B55",
+                }}>
+                  🎰 ガチャをひく！
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* フッター情報 */}
+          <div style={{
+            padding:"10px 16px",background:"rgba(0,0,0,0.3)",
+            display:"flex",justifyContent:"center",gap:20,
+          }}>
+            <div style={{color:"rgba(255,255,255,0.6)",fontSize:11}}>
+              SR <b style={{color:srBoosted?"#FFD700":"rgba(255,255,255,0.8)"}}>{srBoosted?"15%":"7.5%"}</b>
+            </div>
+            <div style={{color:"rgba(255,255,255,0.6)",fontSize:11}}>
+              R <b style={{color:"#7EC8FF"}}>20%</b>
+            </div>
+            <div style={{color:"rgba(255,255,255,0.6)",fontSize:11}}>
+              N <b style={{color:"rgba(255,255,255,0.8)"}}>72.5%</b>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 認定証モーダル */}
       {certModal&&(
