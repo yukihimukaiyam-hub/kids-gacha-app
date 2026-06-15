@@ -233,6 +233,12 @@ const GLOBAL_CSS = `
   @keyframes slideDown{0%{transform:translateY(0);opacity:1}100%{transform:translateY(100%);opacity:0}}
   @keyframes roomBgFade{0%{opacity:0}100%{opacity:1}}
   @keyframes shopSignBounce{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+  @keyframes capsuleSpin{0%{transform:rotate(0deg) translateX(60px) rotate(0deg)}100%{transform:rotate(360deg) translateX(60px) rotate(-360deg)}}
+  @keyframes capsuleStop{0%{transform:scale(1)}30%{transform:scale(1.15)}60%{transform:scale(0.95)}100%{transform:scale(1)}}
+  @keyframes capsuleWiggle{0%,100%{transform:rotate(0deg)}20%{transform:rotate(-12deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(8deg)}}
+  @keyframes capsuleOpen{0%{transform:translateY(0)}100%{transform:translateY(-40px);opacity:0}}
+  @keyframes capsuleOpenBottom{0%{transform:translateY(0)}100%{transform:translateY(30px);opacity:0}}
+  @keyframes greetingIn{0%{transform:scale(0.8) translateY(20px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 `;
 
 function Floaters({ items }) {
@@ -364,16 +370,16 @@ function CharPopup({ char, rarity, isNew, onClose }) {
       </div>
       <div onClick={e=>e.stopPropagation()} style={{position:"relative",zIndex:1,background:"white",borderRadius:32,padding:"40px 32px 32px",width:"100%",maxWidth:340,textAlign:"center",border:`5px solid ${RARITY_COLOR[rarity]}`,boxShadow:isSR?`0 0 0 2px #FFD700, 0 16px 60px #F5A62366, 0 0 80px #FFD70044`:`0 16px 50px ${RARITY_COLOR[rarity]}44`,animation:"popIn 0.45s cubic-bezier(.17,.67,.35,1.3) both"}}>
         <div style={{position:"absolute",top:-2,left:"50%",transform:"translateX(-50%)",background:RARITY_COLOR[rarity],color:"white",borderRadius:"0 0 18px 18px",padding:"6px 28px",fontWeight:900,fontSize:15,letterSpacing:3,boxShadow:`0 4px 14px ${RARITY_COLOR[rarity]}55`}}>{rarity}</div>
-        {isNew&&<div style={{position:"absolute",top:-14,right:-8,background:"#FF4757",color:"white",borderRadius:99,padding:"5px 14px",fontWeight:900,fontSize:13,animation:"newBadge 0.4s 0.3s cubic-bezier(.17,.67,.35,1.5) both",boxShadow:"0 3px 12px #FF475766"}}>NEW！</div>}
+        {isNew&&<div style={{position:"absolute",top:-14,right:-8,background:"#FF4757",color:"white",borderRadius:99,padding:"5px 14px",fontWeight:900,fontSize:12,animation:"newBadge 0.4s 0.3s cubic-bezier(.17,.67,.35,1.5) both",boxShadow:"0 3px 12px #FF475766"}}>はじめてゲット！</div>}
         <div style={{marginTop:28,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",filter:`drop-shadow(0 6px 18px ${RARITY_COLOR[rarity]}66)`,animation:"charFloat 0.6s 0.15s cubic-bezier(.17,.67,.35,1.3) both"}}>
-          {img?<img src={img} alt={char.name} style={{width:180,height:180,objectFit:"contain"}}/>:<span style={{fontSize:110}}>{genre?.emoji||"🎴"}</span>}
+          {img?<img src={img} alt={char.name} style={{width:180,height:180,objectFit:"contain"}}/>:<div style={{width:180,height:180,display:"flex",alignItems:"center",justifyContent:"center",background:genre?`${genre.color}22`:"#f5f5f5",borderRadius:20}}><span style={{fontSize:80}}>{genre?.emoji||"🎴"}</span></div>}
         </div>
         <div style={{fontWeight:900,fontSize:28,color:"#333",marginBottom:10,animation:"fadeUp 0.4s 0.3s ease both"}}>{char.name}</div>
         <div style={{display:"inline-flex",alignItems:"center",gap:6,background:genre?`${genre.color}22`:"#f5f5f5",border:`1.5px solid ${genre?.color||"#eee"}`,borderRadius:99,padding:"5px 16px",fontSize:13,color:genre?.color||"#aaa",fontWeight:700,marginBottom:20,animation:"fadeUp 0.4s 0.35s ease both"}}>
-          {genre?.emoji} {genre?.name}
+          {genre?.name}
         </div>
         <button onClick={onClose} style={{width:"100%",padding:"13px",background:"linear-gradient(135deg,#eee,#ddd)",border:"none",borderRadius:99,fontFamily:"inherit",fontWeight:900,fontSize:15,color:"#888",cursor:"pointer",animation:"fadeUp 0.4s 0.5s ease both"}}>
-          とじる ✕
+          とじる
         </button>
       </div>
     </div>
@@ -385,78 +391,207 @@ const MASCOTS = [
   {id:"houseki_20",emoji:"💎"},{id:"hana_14",emoji:"🌸"},
 ];
 
-function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, consecutiveDupe=0 }) {
-  const [phase,setPhase]=useState("idle");
-  const [mascotIdx,setMascotIdx]=useState(0);
-  const [showPopup,setShowPopup]=useState(false);
-  const isSR=resultRarity==="SR";
-  const srBoosted=consecutiveDupe>=2;
-  const capsuleColor=isSR?["#FFD700","#FFA500"]:resultRarity==="R"?["#7EC8FF","#4A90E2"]:["#A8E6A8","#62C462"];
+// 3カプセルの色定義
+const CAPSULE_COLORS = [
+  ["#FF6B6B","#c0392b"],  // 赤
+  ["#7EC8FF","#4A90E2"],  // 青
+  ["#78D878","#27ae60"],  // 緑
+];
 
+function GachaCapsuleAnimation({ onComplete, resultRarity="R", resultChar, consecutiveDupe=0 }) {
+  // phase: spinning → stopping → wiggling → opening → done
+  const [phase, setPhase] = useState("spinning");
+  const [angle, setAngle] = useState(0);
+  const [selectedIdx, setSelectedIdx] = useState(1); // 真ん中
+  const [showPopup, setShowPopup] = useState(false);
+  const isSR = resultRarity === "SR";
+  const resultColor = isSR
+    ? ["#FFD700","#FFA500"]
+    : resultRarity==="R" ? ["#7EC8FF","#4A90E2"] : ["#78D878","#27ae60"];
+
+  const animRef = useRef(null);
+  const startTime = useRef(Date.now());
+
+  // ぐるぐる回転
   useEffect(()=>{
-    if(phase!=="idle") return;
-    const t=setInterval(()=>setMascotIdx(i=>(i+1)%MASCOTS.length),300);
-    return()=>clearInterval(t);
+    if(phase!=="spinning") return;
+    startTime.current = Date.now();
+    const tick = ()=>{
+      const elapsed = Date.now() - startTime.current;
+      // 2秒で自動停止
+      if(elapsed > 2000){
+        setPhase("stopping");
+        return;
+      }
+      setAngle(a => a + 8);
+      animRef.current = requestAnimationFrame(tick);
+    };
+    animRef.current = requestAnimationFrame(tick);
+    return()=>{ if(animRef.current) cancelAnimationFrame(animRef.current); };
   },[phase]);
 
-  function startDrop(){
-    if(phase!=="idle") return;
-    setPhase("dropping");
-    setTimeout(()=>setPhase("cracking"),800);
-    setTimeout(()=>setPhase("revealed"),1100);
-    setTimeout(()=>setShowPopup(true),1600);
-  }
+  // 停止後の流れ
+  useEffect(()=>{
+    if(phase==="stopping"){
+      setTimeout(()=>setPhase("wiggling"), 200);
+    }
+    if(phase==="wiggling"){
+      setTimeout(()=>setPhase("opening"), 1200); // ゆらゆら4回分
+    }
+    if(phase==="opening"){
+      setTimeout(()=>setShowPopup(true), 800);
+    }
+  },[phase]);
 
-  const mascot=MASCOTS[mascotIdx];
-  const img=getCharImage(mascot.id);
+  // 3つのカプセルの位置（円軌道）
+  const capsulePositions = [0,1,2].map(i=>{
+    const a = (angle + i*120) * Math.PI/180;
+    const rx = 55, ry = 22; // 楕円軌道
+    return {
+      x: Math.sin(a)*rx,
+      y: Math.cos(a)*ry * -1,
+      z: Math.cos(a), // 奥行き（-1〜1）
+    };
+  });
+  // z値でソート（奥から手前へ描画）
+  const sorted = [0,1,2]
+    .map(i=>({i, ...capsulePositions[i]}))
+    .sort((a,b)=>a.z-b.z);
+
+  // 止まったとき、z値が最大（最前面）のカプセルを選択
+  const frontIdx = capsulePositions.reduce((best,p,i)=>p.z>capsulePositions[best].z?i:best,0);
 
   return(
     <>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
-        <div style={{position:"relative",width:130,height:170,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          {phase==="idle"&&(
-            <div style={{animation:"idleBob 1.4s ease-in-out infinite",cursor:"pointer"}} onClick={startDrop}>
-              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110}>
-                {img?<img src={img} style={{width:48,height:48,objectFit:"contain"}} alt=""/>:<span style={{fontSize:40}}>{mascot.emoji}</span>}
-              </Capsule>
-            </div>
-          )}
-          {phase==="dropping"&&(
-            <div style={{animation:"capsuleDrop 0.8s cubic-bezier(.17,.67,.35,1.2) forwards"}}>
-              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110}><span style={{fontSize:40}}>❓</span></Capsule>
-            </div>
-          )}
-          {phase==="cracking"&&(
-            <div style={{animation:"capsuleShake 0.3s ease-in-out"}}>
-              <Capsule color1={capsuleColor[0]} color2={capsuleColor[1]} size={110} cracked><span style={{fontSize:28}}>💥</span></Capsule>
-            </div>
-          )}
-          {phase==="revealed"&&(
-            <div style={{position:"relative",width:110,height:132}}>
-              <div style={{position:"absolute",top:0,left:0,right:0,animation:"topHalfFly 0.5s ease-out forwards"}}><CapsuleHalf color1={capsuleColor[0]} color2={capsuleColor[1]} half="top" size={110}/></div>
-              <div style={{position:"absolute",bottom:0,left:0,right:0,animation:"bottomHalfFly 0.5s ease-out forwards"}}><CapsuleHalf color1={capsuleColor[0]} color2={capsuleColor[1]} half="bottom" size={110}/></div>
-              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",animation:"charReveal 0.5s 0.1s cubic-bezier(.17,.67,.35,1.3) both"}}>
-                <span style={{fontSize:64}}>{mascot.emoji}</span>
+        {/* 3カプセル回転エリア */}
+        <div style={{position:"relative",width:200,height:200,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {sorted.map(({i,x,y,z})=>{
+            const scale = 0.7 + (z+1)*0.25; // 手前ほど大きく
+            const opacity = 0.5 + (z+1)*0.3;
+            const isSelected = i===frontIdx && (phase==="wiggling"||phase==="opening"||phase==="done");
+            const colors = isSelected
+              ? resultColor
+              : CAPSULE_COLORS[i % CAPSULE_COLORS.length];
+
+            return(
+              <div key={i} style={{
+                position:"absolute",
+                transform:`translate(${x}px,${y}px) scale(${scale})`,
+                opacity: phase==="spinning" ? opacity : (isSelected?1:0.3),
+                transition: phase==="spinning"?"none":"all 0.4s ease",
+                zIndex: Math.round(z*10)+10,
+                animation: isSelected && phase==="wiggling" ? "capsuleWiggle 0.25s ease-in-out 4" : "none",
+              }}>
+                {/* 開くフェーズ */}
+                {isSelected && phase==="opening" ? (
+                  <div style={{position:"relative",width:88,height:106}}>
+                    <div style={{position:"absolute",top:0,left:0,right:0,animation:"capsuleOpen 0.6s ease-out forwards"}}>
+                      <CapsuleHalf color1={colors[0]} color2={colors[1]} half="top" size={88}/>
+                    </div>
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,animation:"capsuleOpenBottom 0.6s ease-out forwards"}}>
+                      <CapsuleHalf color1={colors[0]} color2={colors[1]} half="bottom" size={88}/>
+                    </div>
+                  </div>
+                ) : (
+                  <Capsule color1={colors[0]} color2={colors[1]} size={88}/>
+                )}
               </div>
-              {["✦","★","✸","✦","★"].map((s,i)=>(
-                <div key={i} style={{position:"absolute",top:`${[10,5,70,60,30][i]}%`,left:`${[5,80,10,85,50][i]}%`,fontSize:isSR?20:13,color:isSR?"#FFD700":capsuleColor[0],animation:`sparkle 0.4s ${i*0.08}s ease both`}}>{s}</div>
-              ))}
-            </div>
-          )}
+            );
+          })}
+
+          {/* キラキラ（停止後） */}
+          {(phase==="wiggling"||phase==="opening")&&isSR&&["✦","★","✸","✦","★"].map((s,i)=>(
+            <div key={i} style={{
+              position:"absolute",
+              top:`${[10,5,75,65,40][i]}%`,
+              left:`${[10,80,15,80,50][i]}%`,
+              fontSize:16,color:"#FFD700",
+              animation:`sparkle 0.4s ${i*0.1}s ease both`,
+            }}>{s}</div>
+          ))}
         </div>
-        {phase==="idle"&&(
-          <div style={{marginTop:16,fontSize:13,color:"#aaa",fontWeight:700,animation:"idleBob 1.4s ease-in-out infinite"}}>
-            {srBoosted?"✨ SR確率アップ中！タップ！":"タップしてひく！"}
-          </div>
-        )}
+
+        {/* フェーズ表示テキスト */}
+        <div style={{marginTop:8,fontSize:12,color:"rgba(255,255,255,0.7)",fontWeight:700,height:20}}>
+          {phase==="spinning"&&"くるくる…"}
+          {phase==="wiggling"&&"ゆらゆら…"}
+          {phase==="opening"&&"ぱかっ！"}
+        </div>
       </div>
+
       {showPopup&&resultChar&&(
-        <CharPopup char={resultChar} rarity={resultRarity} isNew={resultChar.isNew} onClose={()=>{setShowPopup(false);onComplete&&onComplete();}}/>
+        <CharPopup
+          char={resultChar}
+          rarity={resultRarity}
+          isNew={resultChar.isNew}
+          onClose={()=>{ setShowPopup(false); onComplete&&onComplete(); }}
+        />
       )}
     </>
   );
 }
 
+
+
+// ============================================================
+// ログイン後あいさつポップアップ
+// ============================================================
+function GreetingPopup({ char, onClose }) {
+  const genre = GENRES.find(g=>char.id.startsWith(g.id));
+  const img = getCharImage(char.id);
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed",inset:0,zIndex:5000,
+      display:"flex",alignItems:"center",justifyContent:"center",
+      background:"rgba(0,0,0,0.55)",padding:24,
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:"linear-gradient(160deg,#FFF8E1,#E3F2FD)",
+        borderRadius:28,padding:"28px 24px",
+        width:"100%",maxWidth:300,textAlign:"center",
+        animation:"greetingIn 0.5s cubic-bezier(.17,.67,.35,1.3) both",
+        boxShadow:"0 12px 48px rgba(0,0,0,0.25)",
+        border:"3px solid #FFE082",
+      }}>
+        {/* キャラ画像 */}
+        <div style={{
+          marginBottom:12,
+          filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.15))",
+          display:"flex",alignItems:"center",justifyContent:"center",
+        }}>
+          {img
+            ? <img src={img} alt={char.name} style={{width:120,height:120,objectFit:"contain"}}/>
+            : <span style={{fontSize:72}}>{genre?.emoji||"🎴"}</span>
+          }
+        </div>
+
+        {/* キャラ名 */}
+        <div style={{fontWeight:900,fontSize:16,color:"#555",marginBottom:4}}>
+          {char.name}
+        </div>
+
+        {/* メッセージ */}
+        <div style={{
+          fontWeight:900,fontSize:20,color:"#FF8C00",
+          marginBottom:20,lineHeight:1.5,
+        }}>
+          きょうも<br/>いちにち がんばろう！
+        </div>
+
+        <button onClick={onClose} style={{
+          background:"linear-gradient(135deg,#FFD700,#FF8C00)",
+          border:"none",borderRadius:99,padding:"11px 36px",
+          fontFamily:"inherit",fontWeight:900,fontSize:15,
+          color:"white",cursor:"pointer",
+          boxShadow:"0 4px 16px #FF8C0044",
+        }}>
+          うん、がんばる！
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ============================================================
 // 認定証モーダル
@@ -745,7 +880,8 @@ export default function App() {
   const [shownCerts,setShownCerts]=useState({}); // 表示済み認定証（セッション中）
   const [zukanGenre,setZukanGenre]=useState("umiu");
   const [gachaGenre,setGachaGenre]=useState("all"); // "all" or genreId
-  const [gachaRoomOpen,setGachaRoomOpen]=useState(false); // ガチャ物屋ポップアップ
+  const [gachaRoomOpen,setGachaRoomOpen]=useState(false); // ガチャやさんポップアップ
+  const [greeting,setGreeting]=useState(null); // あいさつポップアップ {char}
   const [certView,setCertView]=useState(null); // にんていしょうタブで選択中
   const [debugMode,setDebugMode]=useState(false); // デバッグモード
   const [debugExpiry,setDebugExpiry]=useState(null); // 有効期限タイムスタンプ
@@ -761,6 +897,20 @@ export default function App() {
   }
 
   useEffect(()=>{ if(players.length>0) saveStorage({players,pin}); },[players,pin]);
+
+  // ログイン後あいさつポップアップ（初回マウント時）
+  useEffect(()=>{
+    if(players.length===0) return;
+    const p = players[0];
+    const allCollected = Object.keys(p.collection||{});
+    if(allCollected.length > 0){
+      // 持っているキャラからランダム1体
+      const randomId = allCollected[Math.floor(Math.random()*allCollected.length)];
+      const char = Object.values(CHARACTERS).flat().find(c=>c.id===randomId);
+      if(char) setTimeout(()=>setGreeting(char), 600);
+    }
+  // eslint-disable-next-line
+  },[]);
 
   // デバッグモードカウントダウン
   useEffect(()=>{
@@ -890,7 +1040,11 @@ export default function App() {
     setGachaKey(k=>k+1);
     setGachaReady(true);
   }
-  function onGachaComplete(){ setGachaReady(false); setGachaPending(null); }
+  function onGachaComplete(){
+    setGachaReady(false);
+    setGachaPending(null);
+    // ガチャ完了後→ガチャやさん内でカテゴリ変更できるよう物屋は開いたまま
+  }
 
   function giveBonus(){
     if(bonusType==="pt"){ updatePlayer(current,p=>({...p,points:p.points+PARENT_BONUS_PT})); addFloater(window.innerWidth/2,200,"⭐"); }
@@ -1109,7 +1263,7 @@ export default function App() {
               🎟️<b style={{color:"#FF8C00"}}>{player.tickets||0}</b>
             </div>
 
-            {/* ガチャ物屋へ入るボタン */}
+            {/* ガチャやさんへ入るボタン */}
             <div style={{textAlign:"center"}}>
               <button
                 onClick={()=>{ if(canGacha) setGachaRoomOpen(true); }}
@@ -1129,7 +1283,7 @@ export default function App() {
                   transition:"all 0.2s",
                   letterSpacing:1,
                 }}>
-                🎰 ガチャをひきに行く！
+                🎪 ガチャやさんへ行く！
               </button>
               {!canGacha&&(
                 <div style={{marginTop:12,color:"#FFB347",fontWeight:700,fontSize:13}}>
@@ -1252,7 +1406,7 @@ export default function App() {
 
       {selectedChar&&<CharDetail char={selectedChar} count={player.collection[selectedChar.id]||0} onClose={()=>setSelectedChar(null)}/>}
 
-      {/* ガチャ物屋ポップアップ */}
+      {/* ガチャやさんポップアップ */}
       {gachaRoomOpen&&(
         <div style={{
           position:"fixed",inset:0,zIndex:2500,
@@ -1280,7 +1434,7 @@ export default function App() {
                 fontSize:14,fontWeight:900,color:"white",
                 animation:"shopSignBounce 2s ease-in-out infinite",
                 display:"inline-block",
-              }}>🎪 ガチャ物屋</div>
+              }}>🎪 ガチャやさん</div>
               {(()=>{
                 const g = gachaGenre==="all" ? null : GENRES.find(x=>x.id===gachaGenre);
                 return g ? (
@@ -1351,20 +1505,26 @@ export default function App() {
                 <div
                   onClick={doGacha}
                   style={{
-                    width:180,height:180,borderRadius:"50%",
+                    width:200,height:200,
                     margin:"0 auto 24px",
-                    background:"radial-gradient(circle at 35% 35%,rgba(255,255,255,0.3),transparent 60%),linear-gradient(135deg,#FF6B6B,#FFD700)",
-                    boxShadow:srBoosted
-                      ?"0 0 0 4px #FFD70044, 0 12px 40px #F5A62366"
-                      :"0 0 0 4px rgba(255,255,255,0.1), 0 12px 40px #FF6B6B55",
                     display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:80,cursor:"pointer",userSelect:"none",
+                    cursor:"pointer",userSelect:"none",
                     transition:"transform 0.1s",
+                    filter:srBoosted?"drop-shadow(0 0 20px #FFD700)":"drop-shadow(0 8px 20px rgba(255,107,107,0.5))",
                   }}
-                  onTouchStart={e=>e.currentTarget.style.transform="scale(0.95)"}
+                  onTouchStart={e=>e.currentTarget.style.transform="scale(0.93)"}
                   onTouchEnd={e=>e.currentTarget.style.transform="scale(1)"}
                 >
-                  🎰
+                  <img
+                    src="/images/gacha01.png"
+                    alt="ガチャ"
+                    style={{width:200,height:200,objectFit:"contain"}}
+                    onError={e=>{
+                      e.target.style.display="none";
+                      e.target.nextSibling.style.display="flex";
+                    }}
+                  />
+                  <div style={{display:"none",width:180,height:180,borderRadius:"50%",background:"linear-gradient(135deg,#FF6B6B,#FFD700)",alignItems:"center",justifyContent:"center",fontSize:80}}>🎰</div>
                 </div>
 
                 <div style={{color:"rgba(255,255,255,0.8)",fontSize:13,marginBottom:8}}>
@@ -1374,7 +1534,7 @@ export default function App() {
                   1回 = {GACHA_COST}pt または 🎟️1まい
                 </div>
 
-                {/* 連続で引くボタン */}
+                {/* ガチャをまわすボタン */}
                 <button onClick={doGacha} style={{
                   marginTop:20,
                   background:"linear-gradient(135deg,#FF6B6B,#FFD700)",
@@ -1383,8 +1543,30 @@ export default function App() {
                   color:"white",cursor:"pointer",
                   boxShadow:"0 4px 20px #FF6B6B55",
                 }}>
-                  🎰 ガチャをひく！
+                  🎰 ガチャをまわす！
                 </button>
+
+                {/* カテゴリ変更 */}
+                <div style={{marginTop:20}}>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:8}}>カテゴリをかえる</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+                    <button onClick={()=>setGachaGenre("all")} style={{
+                      padding:"5px 12px",borderRadius:99,border:"none",
+                      background:gachaGenre==="all"?"#FF8C00":"rgba(255,255,255,0.15)",
+                      color:"white",fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
+                    }}>🎲 全部</button>
+                    {GENRES.filter(g=>g.active).map(g=>{
+                      const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
+                      return(
+                        <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
+                          padding:"5px 12px",borderRadius:99,border:"none",
+                          background:gachaGenre===g.id?g.color:"rgba(255,255,255,0.15)",
+                          color:"white",fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
+                        }}>{g.emoji}{cnt===30?" 🏆":""}</button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1405,6 +1587,11 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* あいさつポップアップ */}
+      {greeting&&(
+        <GreetingPopup char={greeting} onClose={()=>setGreeting(null)}/>
       )}
 
       {/* 認定証モーダル */}
