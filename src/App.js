@@ -1047,11 +1047,13 @@ export default function App() {
   // ガチャやさん：ポイント・チケットがなくなったら自動で閉じる
   useEffect(()=>{
     if(!gachaRoomOpen) return;
-    if(debugMode) return; // デバッグモード中は閉じない
-    if(!gachaReady && canGachaCount <= 0){
+    if(debugMode) return;
+    const count = Math.floor((players[current]?.points||0)/GACHA_COST)+((players[current]?.tickets)||0);
+    if(!gachaReady && count <= 0){
       setGachaRoomOpen(false);
     }
-  },[canGachaCount, gachaRoomOpen, gachaReady, debugMode]);
+  // eslint-disable-next-line
+  },[gachaRoomOpen, gachaReady, debugMode, players, current]);
 
   // デバッグモードカウントダウン
   useEffect(()=>{
@@ -1287,9 +1289,7 @@ export default function App() {
           }}>終了</button>
         </div>
       )}
-      <div style={{background:"linear-gradient(90deg,#5BC8E8,#4ECDC4)",padding:"12px 14px 14px",borderRadius:"0 0 22px 22px",boxShadow:"0 4px 18px rgba(0,0,0,0.10)"
-      ,borderRadius:debugMode?"0 0 22px 22px":"0 0 22px 22px"
-      }}>
+      <div style={{background:"linear-gradient(90deg,#5BC8E8,#4ECDC4)",padding:"12px 14px 14px",borderRadius:"0 0 22px 22px",boxShadow:"0 4px 18px rgba(0,0,0,0.10)"}}>
         <div style={{display:"flex",gap:6,marginBottom:10}}>
           {players.map((p,i)=>(
             <button key={i} onClick={()=>{setCurrent(i);setGachaReady(false);setGachaPending(null);}} style={{flex:1,padding:"7px 4px",borderRadius:12,border:"none",background:i===current?"white":"rgba(255,255,255,0.3)",color:i===current?"#333":"white",fontFamily:"inherit",fontWeight:800,fontSize:13,cursor:"pointer",transition:"all 0.2s"}}>{p.name}</button>
@@ -1375,7 +1375,7 @@ export default function App() {
                   const isSelected=gachaGenre===g.id;
                   return(
                     <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
-                      padding:"10px 14px",borderRadius:14,border:"none",
+                      padding:"10px 14px",borderRadius:14,
                       background:isSelected?`linear-gradient(135deg,${g.color},${g.color}cc)`:"white",
                       color:isSelected?"white":"#666",
                       fontFamily:"inherit",fontWeight:800,fontSize:12,cursor:"pointer",
