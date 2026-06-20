@@ -1,12 +1,30 @@
 import { useState, useRef, useEffect } from "react";
 
 const GENRES = [
-  { id: "umiu",    name: "ウミウシ", emoji: "🐚", color: "#5BC8E8", active: true },
-  { id: "kinoko",  name: "きのこ",   emoji: "🍄", color: "#A0784A", active: true },
-  { id: "houseki", name: "宝石",     emoji: "💎", color: "#B787E0", active: true },
-  { id: "hana",    name: "はな",     emoji: "🌸", color: "#FF8FAB", active: true },
-  { id: "sakana",  name: "さかな",   emoji: "🐠", color: "#4ECDC4", active: true },
-  { id: "dobutsu", name: "どうぶつ", emoji: "🐾", color: "#FFAA5A", active: true },
+  { id: "umiu",       name: "ウミウシ",       emoji: "🐚", color: "#5BC8E8", active: true,  free: true  },
+  { id: "kinoko",     name: "きのこ",         emoji: "🍄", color: "#A0784A", active: true,  free: false },
+  { id: "houseki",    name: "宝石",           emoji: "💎", color: "#B787E0", active: true,  free: false },
+  { id: "hana",       name: "はな",           emoji: "🌸", color: "#FF8FAB", active: true,  free: false },
+  { id: "sakana",     name: "さかな",         emoji: "🐠", color: "#4ECDC4", active: true,  free: false },
+  { id: "dobutsu",    name: "どうぶつ",       emoji: "🐾", color: "#FFAA5A", active: true,  free: false },
+  { id: "hachurui",   name: "は虫類・両生類", emoji: "🦎", color: "#7DBF6A", active: false, free: false },
+  { id: "biseibutsu", name: "微生物",         emoji: "🔬", color: "#A8D8A8", active: false, free: false },
+  { id: "shokuchu",   name: "食虫植物",       emoji: "🌿", color: "#E8A838", active: false, free: false },
+  { id: "mushi",      name: "むし",           emoji: "🐛", color: "#D4756A", active: false, free: false },
+];
+
+// 総合認定証ランク定義
+const TOTAL_CERT_RANKS = [
+  { threshold:  50, title: "コレクション見習い",    file: "cert_total_050" },
+  { threshold: 100, title: "コレクション隊員",      file: "cert_total_100" },
+  { threshold: 150, title: "コレクション探検家",    file: "cert_total_150" },
+  { threshold: 200, title: "コレクション研究員",    file: "cert_total_200" },
+  { threshold: 250, title: "コレクション博士補",    file: "cert_total_250" },
+  { threshold: 300, title: "コレクション博士",      file: "cert_total_300" },
+  { threshold: 350, title: "コレクションマスター",  file: "cert_total_350" },
+  { threshold: 400, title: "レジェンドコレクター",  file: "cert_total_400" },
+  { threshold: 450, title: "大発見マスター",        file: "cert_total_450" },
+  { threshold: 500, title: "まいにちコレクション王",file: "cert_total_500" },
 ];
 
 const CHARACTERS = {
@@ -118,6 +136,78 @@ const CHARACTERS = {
     {id:"dobutsu_28",name:"にくじゃく",rarity:"SR"},{id:"dobutsu_29",name:"ほしおおかみ",rarity:"SR"},
     {id:"dobutsu_30",name:"つきしろ",rarity:"SR"},
   ],
+  hachurui: [
+    {id:"hachurui_01",name:"あまちゃん",rarity:"N"},{id:"hachurui_02",name:"とのさま",rarity:"N"},
+    {id:"hachurui_03",name:"いもりん",rarity:"N"},{id:"hachurui_04",name:"やもりん",rarity:"N"},
+    {id:"hachurui_05",name:"かなへびん",rarity:"N"},{id:"hachurui_06",name:"とかげん",rarity:"N"},
+    {id:"hachurui_07",name:"ひょっこり",rarity:"N"},{id:"hachurui_08",name:"ちゃいろん",rarity:"N"},
+    {id:"hachurui_09",name:"きみどり",rarity:"N"},{id:"hachurui_10",name:"べたぺた",rarity:"N"},
+    {id:"hachurui_11",name:"のそのそ",rarity:"N"},{id:"hachurui_12",name:"みずたろう",rarity:"N"},
+    {id:"hachurui_13",name:"しましま",rarity:"N"},{id:"hachurui_14",name:"あおへび",rarity:"N"},
+    {id:"hachurui_15",name:"にこがお",rarity:"N"},{id:"hachurui_16",name:"おたまる",rarity:"N"},
+    {id:"hachurui_17",name:"つちまる",rarity:"N"},{id:"hachurui_18",name:"こけもり",rarity:"N"},
+    {id:"hachurui_19",name:"きんめだま",rarity:"R"},{id:"hachurui_20",name:"にじいろん",rarity:"R"},
+    {id:"hachurui_21",name:"もふもふ",rarity:"R"},{id:"hachurui_22",name:"ひょうもん",rarity:"R"},
+    {id:"hachurui_23",name:"あおきら",rarity:"R"},{id:"hachurui_24",name:"あかまる",rarity:"R"},
+    {id:"hachurui_25",name:"ほしがめ",rarity:"R"},{id:"hachurui_26",name:"くろまし",rarity:"R"},
+    {id:"hachurui_27",name:"みどりりゅう",rarity:"R"},
+    {id:"hachurui_28",name:"りゅうじん",rarity:"SR"},{id:"hachurui_29",name:"にじのめ",rarity:"SR"},
+    {id:"hachurui_30",name:"しんぴのもり",rarity:"SR"},
+  ],
+  biseibutsu: [
+    {id:"biseibutsu_01",name:"みかづきん",rarity:"N"},{id:"biseibutsu_02",name:"くるくる",rarity:"N"},
+    {id:"biseibutsu_03",name:"ふねっち",rarity:"N"},{id:"biseibutsu_04",name:"ばらみん",rarity:"N"},
+    {id:"biseibutsu_05",name:"もじゃりん",rarity:"N"},{id:"biseibutsu_06",name:"まりもん",rarity:"N"},
+    {id:"biseibutsu_07",name:"つぶつぶ",rarity:"N"},{id:"biseibutsu_08",name:"にこにこ",rarity:"N"},
+    {id:"biseibutsu_09",name:"ふわりん",rarity:"N"},{id:"biseibutsu_10",name:"みどりたま",rarity:"N"},
+    {id:"biseibutsu_11",name:"ほしみん",rarity:"N"},{id:"biseibutsu_12",name:"おさかなくん",rarity:"N"},
+    {id:"biseibutsu_13",name:"たこあし",rarity:"N"},{id:"biseibutsu_14",name:"きらぼち",rarity:"N"},
+    {id:"biseibutsu_15",name:"みずだま",rarity:"N"},{id:"biseibutsu_16",name:"ぼよん",rarity:"N"},
+    {id:"biseibutsu_17",name:"ころころ",rarity:"N"},{id:"biseibutsu_18",name:"わっかりん",rarity:"N"},
+    {id:"biseibutsu_19",name:"つのっち",rarity:"R"},{id:"biseibutsu_20",name:"らっぱん",rarity:"R"},
+    {id:"biseibutsu_21",name:"きらきら",rarity:"R"},{id:"biseibutsu_22",name:"おどるん",rarity:"R"},
+    {id:"biseibutsu_23",name:"ほしのこ",rarity:"R"},{id:"biseibutsu_24",name:"にじいろ",rarity:"R"},
+    {id:"biseibutsu_25",name:"ひげまる",rarity:"R"},{id:"biseibutsu_26",name:"ぎざぎざ",rarity:"R"},
+    {id:"biseibutsu_27",name:"ほたるん",rarity:"R"},
+    {id:"biseibutsu_28",name:"ふしぎぐま",rarity:"SR"},{id:"biseibutsu_29",name:"ぎんがぼし",rarity:"SR"},
+    {id:"biseibutsu_30",name:"うちゅうだま",rarity:"SR"},
+  ],
+  shokuchu: [
+    {id:"shokuchu_01",name:"ハエトリくん",rarity:"N"},{id:"shokuchu_02",name:"ウツボちゃん",rarity:"N"},
+    {id:"shokuchu_03",name:"モウセンくん",rarity:"N"},{id:"shokuchu_04",name:"サラセニアくん",rarity:"N"},
+    {id:"shokuchu_05",name:"ムシトリスミちゃん",rarity:"N"},{id:"shokuchu_06",name:"ヘリアンくん",rarity:"N"},
+    {id:"shokuchu_07",name:"あかモウセン",rarity:"N"},{id:"shokuchu_08",name:"まるつぼ",rarity:"N"},
+    {id:"shokuchu_09",name:"しまつぼ",rarity:"N"},{id:"shokuchu_10",name:"きいろつぼ",rarity:"N"},
+    {id:"shokuchu_11",name:"みどりふた",rarity:"N"},{id:"shokuchu_12",name:"あかふた",rarity:"N"},
+    {id:"shokuchu_13",name:"つやつや",rarity:"N"},{id:"shokuchu_14",name:"ちびごけ",rarity:"N"},
+    {id:"shokuchu_15",name:"しずくん",rarity:"N"},{id:"shokuchu_16",name:"ふわりん",rarity:"N"},
+    {id:"shokuchu_17",name:"こつぼん",rarity:"N"},{id:"shokuchu_18",name:"にこふた",rarity:"N"},
+    {id:"shokuchu_19",name:"べにひめ",rarity:"R"},{id:"shokuchu_20",name:"きらつぼ",rarity:"R"},
+    {id:"shokuchu_21",name:"しろぼし",rarity:"R"},{id:"shokuchu_22",name:"あまつゆ",rarity:"R"},
+    {id:"shokuchu_23",name:"おうじゃ",rarity:"R"},{id:"shokuchu_24",name:"かみつき",rarity:"R"},
+    {id:"shokuchu_25",name:"ドラゴン",rarity:"R"},{id:"shokuchu_26",name:"みやびごけ",rarity:"R"},
+    {id:"shokuchu_27",name:"ぎんつぼ",rarity:"R"},
+    {id:"shokuchu_28",name:"だいおうつぼ",rarity:"SR"},{id:"shokuchu_29",name:"しんびのつぼ",rarity:"SR"},
+    {id:"shokuchu_30",name:"きせきのわな",rarity:"SR"},
+  ],
+  mushi: [
+    {id:"mushi_01",name:"てんとうむし",rarity:"N"},{id:"mushi_02",name:"ちょうちょん",rarity:"N"},
+    {id:"mushi_03",name:"とんぼん",rarity:"N"},{id:"mushi_04",name:"みつばち",rarity:"N"},
+    {id:"mushi_05",name:"ありんこ",rarity:"N"},{id:"mushi_06",name:"かぶくん",rarity:"N"},
+    {id:"mushi_07",name:"くわがたん",rarity:"N"},{id:"mushi_08",name:"びかりん",rarity:"N"},
+    {id:"mushi_09",name:"かまきち",rarity:"N"},{id:"mushi_10",name:"せみまる",rarity:"N"},
+    {id:"mushi_11",name:"ばったん",rarity:"N"},{id:"mushi_12",name:"こおろぎ",rarity:"N"},
+    {id:"mushi_13",name:"ほたるん",rarity:"N"},{id:"mushi_14",name:"てんてんぐん",rarity:"N"},
+    {id:"mushi_15",name:"くもくん",rarity:"N"},{id:"mushi_16",name:"みずすまし",rarity:"N"},
+    {id:"mushi_17",name:"みのむしくん",rarity:"N"},{id:"mushi_18",name:"だんごむし",rarity:"N"},
+    {id:"mushi_19",name:"ぎらぎら",rarity:"R"},{id:"mushi_20",name:"うすばちゃん",rarity:"R"},
+    {id:"mushi_21",name:"へびとんぼん",rarity:"R"},{id:"mushi_22",name:"きりぎりす",rarity:"R"},
+    {id:"mushi_23",name:"はなかみきり",rarity:"R"},{id:"mushi_24",name:"おにやんま",rarity:"R"},
+    {id:"mushi_25",name:"かみきりん",rarity:"R"},{id:"mushi_26",name:"はちきゅう",rarity:"R"},
+    {id:"mushi_27",name:"ちょうおう",rarity:"R"},
+    {id:"mushi_28",name:"ぎんがざむらい",rarity:"SR"},{id:"mushi_29",name:"むしのじょうおう",rarity:"SR"},
+    {id:"mushi_30",name:"ほしのかぶくわ",rarity:"SR"},
+  ],
 };
 
 const ACTIVE_GENRE_IDS = GENRES.filter(g => g.active).map(g => g.id);
@@ -144,6 +234,10 @@ const PARENT_BONUS_TICKET = 1;
 function makePlayer(name) {
   return { name, points:0, tickets:0, collection:{}, tasks:[], lastReset:todayStr(), consecutiveDupe:0 };
 }
+// デフォルトの表示ジャンル（全active）
+function defaultVisibleGenres() {
+  return GENRES.filter(g=>g.active).map(g=>g.id);
+}
 function rollGacha(consecutiveDupe, completedGenres=[]) {
   const r = Math.random();
   const srRate = consecutiveDupe >= 2 ? 0.15 : 0.075;
@@ -163,6 +257,10 @@ function getCharImage(charId) {
   return null;
 }
 function getCertImage(genreId) {
+  // 総合認定証（"total_cert_total_XXX"形式）
+  if (genreId.startsWith("total_")) {
+    return `/images/${genreId.replace("total_","")}.png`;
+  }
   return `/images/cert_${genreId}.png`;
 }
 // ジャンル選択対応ガチャ
@@ -247,22 +345,22 @@ function Floaters({ items }) {
   ))}</>;
 }
 
-function PointBar({ points, tickets }) {
-  const full = Math.floor(points / GACHA_COST);
+function PointBar({ points, tickets, canGachaCount }) {
   const partial = (points % GACHA_COST) / GACHA_COST;
+  const remain = GACHA_COST - (points % GACHA_COST === 0 && points > 0 ? GACHA_COST : points % GACHA_COST);
   return (
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <div style={{flex:1}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#aaa",marginBottom:3}}>
           <span>⭐ {points}pt {tickets>0&&<span style={{color:"#FF8C00"}}>🎟️×{tickets}</span>}</span>
-          <span>あと{GACHA_COST-(points%GACHA_COST===0&&points>0?GACHA_COST:points%GACHA_COST)}pt</span>
+          <span>あと{remain}pt</span>
         </div>
         <div style={{background:"#eee",borderRadius:99,height:10,overflow:"hidden"}}>
           <div style={{width:`${partial*100}%`,height:"100%",background:"linear-gradient(90deg,#FFD700,#FF8C00)",borderRadius:99,transition:"width 0.4s ease"}}/>
         </div>
       </div>
       <div style={{background:"#5599EE",color:"white",borderRadius:12,padding:"4px 10px",fontWeight:900,fontSize:13,whiteSpace:"nowrap"}}>
-        🎰 {full+(tickets||0)}回
+        🎰 {canGachaCount !== undefined ? canGachaCount : Math.floor(points/GACHA_COST)+(tickets||0)}回
       </div>
     </div>
   );
@@ -882,6 +980,14 @@ export default function App() {
   const [gachaGenre,setGachaGenre]=useState("all"); // "all" or genreId
   const [gachaRoomOpen,setGachaRoomOpen]=useState(false); // ガチャやさんポップアップ
   const [greeting,setGreeting]=useState(null); // あいさつポップアップ {char}
+  const [visibleGenres,setVisibleGenres]=useState(()=>{
+    const saved=loadStorage();
+    return saved?.visibleGenres || defaultVisibleGenres();
+  }); // 親が表示するジャンルを選択
+  const [totalCertModal,setTotalCertModal]=useState(null); // 総合認定証ポップアップ
+  const [shownTotalCerts,setShownTotalCerts]=useState({}); // 表示済み総合認定証
+  const bgmRef = useRef(null); // BGM Audio
+  const gachaBgmRef = useRef(null); // ガチャBGM Audio（将来用）
   const [certView,setCertView]=useState(null); // にんていしょうタブで選択中
   const [debugMode,setDebugMode]=useState(false); // デバッグモード
   const [debugExpiry,setDebugExpiry]=useState(null); // 有効期限タイムスタンプ
@@ -911,6 +1017,41 @@ export default function App() {
     }
   // eslint-disable-next-line
   },[]);
+
+  // BGM初期化・ループ再生
+  useEffect(()=>{
+    const audio = new Audio("/bgm_main.mp3");
+    audio.loop = true;
+    audio.volume = 0.4;
+    bgmRef.current = audio;
+    audio.play().catch(()=>{}); // 自動再生ブロック対応
+    return ()=>{ audio.pause(); audio.src=""; };
+  },[]);
+
+  // ガチャやさん開閉でBGM切替（将来のガチャBGM対応）
+  useEffect(()=>{
+    if(!bgmRef.current) return;
+    if(gachaRoomOpen){
+      // ガチャBGMがある場合はここで切替（現在はメインBGMをそのまま継続）
+      // bgmRef.current.pause(); gachaBgmRef.current?.play();
+    } else {
+      // bgmRef.current.play().catch(()=>{});
+    }
+  },[gachaRoomOpen]);
+
+  // visibleGenresが変わったらlocalStorageに保存
+  useEffect(()=>{
+    if(players.length>0) saveStorage({players, pin, visibleGenres});
+  },[visibleGenres]);
+
+  // ガチャやさん：ポイント・チケットがなくなったら自動で閉じる
+  useEffect(()=>{
+    if(!gachaRoomOpen) return;
+    if(debugMode) return; // デバッグモード中は閉じない
+    if(!gachaReady && canGachaCount <= 0){
+      setGachaRoomOpen(false);
+    }
+  },[canGachaCount, gachaRoomOpen, gachaReady, debugMode]);
 
   // デバッグモードカウントダウン
   useEffect(()=>{
@@ -1002,6 +1143,16 @@ export default function App() {
     }).map(g => g.id);
   }
 
+  // 総合認定証チェック：コレクション数に応じたランクを返す
+  function getTotalCertRank(collection) {
+    const total = Object.keys(collection).length;
+    let currentRank = null;
+    for(const rank of TOTAL_CERT_RANKS){
+      if(total >= rank.threshold) currentRank = rank;
+    }
+    return currentRank; // 現在の最高ランク
+  }
+
   function doGacha(){
     if(gachaReady) return;
     const canUseTicket=(player.tickets||0)>0;
@@ -1026,7 +1177,15 @@ export default function App() {
         setTimeout(()=>{
           setCertModal({genreId, genreName:genre.name, genreEmoji:genre.emoji});
           setShownCerts(prev=>({...prev,[genreId]:true}));
-        }, 2200); // ポップアップ後に表示
+        }, 2200);
+      }
+      // 総合認定証チェック
+      const totalRank = getTotalCertRank(newCollection);
+      if(totalRank && !shownTotalCerts[totalRank.file]){
+        setTimeout(()=>{
+          setTotalCertModal(totalRank);
+          setShownTotalCerts(prev=>({...prev,[totalRank.file]:true}));
+        }, justCompleted?4000:2200);
       }
       return{
         ...p,
@@ -1137,22 +1296,8 @@ export default function App() {
           ))}
           <button onClick={()=>{setParentOpen(true);setParentAuth(false);}} style={{padding:"7px 12px",borderRadius:12,border:"none",background:"rgba(255,255,255,0.25)",color:"white",fontSize:18,cursor:"pointer"}}>🔐</button>
         </div>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
-          <div style={{flex:1,background:"rgba(255,255,255,0.9)",borderRadius:12,padding:"7px 10px",textAlign:"center"}}>
-            <div style={{fontSize:9,color:"#aaa"}}>ずかん</div>
-            <div style={{fontWeight:900,color:"#FF8C00",fontSize:15}}>{collected}<span style={{fontSize:10,color:"#ccc"}}>/{totalActive}</span></div>
-          </div>
-          <div style={{flex:1,background:"rgba(255,255,255,0.9)",borderRadius:12,padding:"7px 10px",textAlign:"center"}}>
-            <div style={{fontSize:9,color:"#aaa"}}>タスク</div>
-            <div style={{fontWeight:900,color:"#62C462",fontSize:15}}>{doneTasks}/{totalTasks}</div>
-          </div>
-          <div style={{flex:1,background:"rgba(255,255,255,0.9)",borderRadius:12,padding:"7px 10px",textAlign:"center"}}>
-            <div style={{fontSize:9,color:"#aaa"}}>ガチャけん</div>
-            <div style={{fontWeight:900,color:"#4A90E2",fontSize:15}}>🎰{canGachaCount}</div>
-          </div>
-        </div>
-        <div style={{background:"rgba(255,255,255,0.9)",borderRadius:12,padding:"8px 12px"}}>
-          <PointBar points={player.points} tickets={player.tickets||0}/>
+        <div style={{background:"rgba(255,255,255,0.9)",borderRadius:12,padding:"8px 12px",marginBottom:0}}>
+          <PointBar points={player.points} tickets={player.tickets||0} canGachaCount={canGachaCount}/>
         </div>
       </div>
 
@@ -1224,7 +1369,7 @@ export default function App() {
                   boxShadow:gachaGenre==="all"?"0 3px 12px #FF8C0044":"0 1px 4px #0001",
                   transition:"all 0.2s",
                 }}>🎲 ぜんぶ</button>
-                {GENRES.filter(g=>g.active).map(g=>{
+                {GENRES.filter(g=>g.active && visibleGenres.includes(g.id)).map(g=>{
                   const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
                   const isComplete=cnt===30;
                   const isSelected=gachaGenre===g.id;
@@ -1296,6 +1441,12 @@ export default function App() {
 
         {tab==="zukan"&&(
           <>
+            {/* ずかん数表示 */}
+            <div style={{textAlign:"center",marginBottom:10,padding:"8px 12px",background:"white",borderRadius:14,boxShadow:"0 1px 4px #0001"}}>
+              <span style={{fontSize:12,color:"#aaa",fontWeight:700}}>あつめたキャラ　</span>
+              <span style={{fontSize:18,fontWeight:900,color:"#FF8C00"}}>{collected}</span>
+              <span style={{fontSize:11,color:"#ccc"}}>/{totalActive}</span>
+            </div>
             <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:4}}>
               {GENRES.map(g=>{
                 const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
@@ -1331,7 +1482,7 @@ export default function App() {
             <div style={{fontSize:12,color:"#aaa",marginBottom:12,textAlign:"center",fontWeight:700}}>
               🏆 タップすると大きく見られるよ！
             </div>
-            {GENRES.filter(g=>g.active).map(g=>{
+            {GENRES.filter(g=>g.active && visibleGenres.includes(g.id)).map(g=>{
               const cnt = CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
               const isComplete = cnt === 30;
               return(
@@ -1374,6 +1525,64 @@ export default function App() {
                 </div>
               );
             })}
+            {/* 総合認定証セクション */}
+            <div style={{marginTop:16,padding:"14px",background:"linear-gradient(135deg,#FFF8E1,#FFF3C4)",borderRadius:16,border:"2px solid #FFD700"}}>
+              <div style={{fontWeight:900,fontSize:14,color:"#B8720A",marginBottom:10,textAlign:"center"}}>
+                🌟 そうごう にんていしょう
+              </div>
+              {(()=>{
+                const currentRank = TOTAL_CERT_RANKS.filter(r=>collected>=r.threshold).slice(-1)[0];
+                const nextRank = TOTAL_CERT_RANKS.find(r=>r.threshold>collected);
+                return(
+                  <div>
+                    {/* 現在のランク */}
+                    {currentRank ? (
+                      <div onClick={()=>setCertView("total_"+currentRank.file)}
+                        style={{display:"flex",alignItems:"center",gap:12,background:"white",borderRadius:12,padding:"10px 12px",marginBottom:10,cursor:"pointer",border:"2px solid #FFD700",boxShadow:"0 2px 8px #FFD70022"}}>
+                        <img src={`/images/${currentRank.file}.png`} alt={currentRank.title}
+                          style={{width:56,height:56,objectFit:"cover",borderRadius:10,border:"2px solid #FFD700"}}
+                          onError={e=>{e.target.style.display="none";}}
+                        />
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:900,fontSize:14,color:"#B8720A"}}>{currentRank.title}</div>
+                          <div style={{fontSize:11,color:"#aaa",marginTop:2}}>{currentRank.threshold}種 達成！認定証を見る →</div>
+                        </div>
+                        <span style={{fontSize:20}}>🏆</span>
+                      </div>
+                    ):(
+                      <div style={{textAlign:"center",color:"#ccc",fontSize:12,padding:"8px 0"}}>
+                        50種あつめると最初の認定証がもらえるよ！
+                      </div>
+                    )}
+                    {/* 次のランクへの進捗 */}
+                    {nextRank&&(
+                      <div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginBottom:4}}>
+                          <span>つぎ：{nextRank.title}（{nextRank.threshold}種）</span>
+                          <span>{collected}/{nextRank.threshold}</span>
+                        </div>
+                        <div style={{background:"#eee",borderRadius:99,height:8,overflow:"hidden"}}>
+                          <div style={{
+                            width:`${Math.min(100,(collected/(nextRank.threshold))*100)}%`,
+                            height:"100%",
+                            background:"linear-gradient(90deg,#FFD700,#FF8C00)",
+                            borderRadius:99,transition:"width 0.5s ease"
+                          }}/>
+                        </div>
+                        <div style={{fontSize:10,color:"#ccc",marginTop:4,textAlign:"right"}}>
+                          あと{nextRank.threshold-collected}種！
+                        </div>
+                      </div>
+                    )}
+                    {!nextRank&&currentRank&&(
+                      <div style={{textAlign:"center",color:"#FFD700",fontWeight:900,fontSize:13,marginTop:8}}>
+                        🎊 すべての総合認定証を達成！
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
       </div>
@@ -1555,7 +1764,7 @@ export default function App() {
                       background:gachaGenre==="all"?"#FF8C00":"rgba(255,255,255,0.15)",
                       color:"white",fontFamily:"inherit",fontWeight:800,fontSize:11,cursor:"pointer",
                     }}>🎲 全部</button>
-                    {GENRES.filter(g=>g.active).map(g=>{
+                    {GENRES.filter(g=>g.active && visibleGenres.includes(g.id)).map(g=>{
                       const cnt=CHARACTERS[g.id].filter(c=>player.collection[c.id]).length;
                       return(
                         <button key={g.id} onClick={()=>setGachaGenre(g.id)} style={{
@@ -1602,6 +1811,46 @@ export default function App() {
           genreEmoji={certModal.genreEmoji}
           onClose={()=>setCertModal(null)}
         />
+      )}
+
+      {/* 総合認定証ポップアップ */}
+      {totalCertModal&&(
+        <div onClick={()=>setTotalCertModal(null)} style={{
+          position:"fixed",inset:0,zIndex:4500,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          background:"rgba(0,0,0,0.85)",padding:16,
+        }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            position:"relative",width:"100%",maxWidth:380,
+            animation:"popIn 0.5s cubic-bezier(.17,.67,.35,1.3) both",
+          }}>
+            {/* 金のキラキラ */}
+            <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
+              {Array.from({length:20}).map((_,i)=>{
+                const x=Math.random()*100, delay=Math.random()*0.8, dur=1.2+Math.random()*1.0;
+                return <div key={i} style={{position:"absolute",left:`${x}%`,top:-20,fontSize:12+Math.random()*10,color:"#FFD700",animation:`particleFall ${dur}s ease-in ${delay}s forwards`,opacity:0}}>✦</div>;
+              })}
+            </div>
+            <img
+              src={`/images/${totalCertModal.file}.png`}
+              alt={totalCertModal.title}
+              style={{width:"100%",borderRadius:20,display:"block",boxShadow:"0 8px 48px rgba(255,215,0,0.4)"}}
+              onError={e=>{e.target.style.display="none";}}
+            />
+            <div style={{textAlign:"center",marginTop:12,color:"#FFD700",fontWeight:900,fontSize:14,textShadow:"0 2px 8px rgba(0,0,0,0.8)"}}>
+              🌟 {totalCertModal.title} 🌟
+            </div>
+            <div style={{textAlign:"center",marginTop:4,color:"rgba(255,255,255,0.7)",fontSize:12}}>
+              タップしてとじる
+            </div>
+            <button onClick={()=>setTotalCertModal(null)} style={{
+              position:"absolute",top:10,right:10,
+              background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",
+              width:36,height:36,fontSize:18,color:"white",
+              cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,
+            }}>✕</button>
+          </div>
+        </div>
       )}
 
       {parentOpen&&(
@@ -1690,6 +1939,43 @@ export default function App() {
                     </div>
 
                     {/* ★ バックアップパネル（独立コンポーネント） */}
+                    {/* ジャンル表示設定 */}
+                    <div style={{background:"#f9f9f9",borderRadius:14,padding:14,marginBottom:14}}>
+                      <div style={{fontWeight:800,color:"#555",fontSize:13,marginBottom:6}}>📚 ひょうじするジャンル</div>
+                      <div style={{fontSize:11,color:"#aaa",marginBottom:10,lineHeight:1.6}}>
+                        ずかん・ガチャ・にんていしょうに表示するジャンルをえらんでね
+                      </div>
+                      {GENRES.filter(g=>g.active).map(g=>{
+                        const isVisible = visibleGenres.includes(g.id);
+                        const isFree = g.free;
+                        return(
+                          <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #eee"}}>
+                            <span style={{fontSize:20}}>{g.emoji}</span>
+                            <div style={{flex:1}}>
+                              <div style={{fontWeight:700,fontSize:13,color:"#333"}}>{g.name}</div>
+                              {isFree&&<div style={{fontSize:10,color:"#62C462",fontWeight:700}}>無料</div>}
+                            </div>
+                            <button onClick={()=>{
+                              if(isFree) return; // 無料ジャンルは常に表示
+                              setVisibleGenres(prev=>
+                                isVisible
+                                  ? prev.filter(id=>id!==g.id)
+                                  : [...prev, g.id]
+                              );
+                            }} style={{
+                              padding:"5px 14px",borderRadius:99,border:"none",
+                              background:isVisible?"#4CAF50":"#ddd",
+                              color:"white",fontWeight:800,fontSize:12,
+                              cursor:isFree?"default":"pointer",
+                              opacity:isFree?0.6:1,
+                            }}>
+                              {isFree?"固定":isVisible?"表示中":"非表示"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     <BackupPanel players={players} pin={pin} setPlayers={setPlayers} setPin={setPin}/>
 
                     {/* 全リセット */}
