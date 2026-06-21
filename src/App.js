@@ -1024,8 +1024,24 @@ export default function App() {
     audio.loop = true;
     audio.volume = 0.4;
     bgmRef.current = audio;
-    audio.play().catch(()=>{}); // 自動再生ブロック対応
-    return ()=>{ audio.pause(); audio.src=""; };
+    audio.play().catch(()=>{});
+
+    // 画面を離れたら一時停止・戻ったら再開
+    const handleVisibility = ()=>{
+      if(!bgmRef.current) return;
+      if(document.hidden){
+        bgmRef.current.pause();
+      } else {
+        bgmRef.current.play().catch(()=>{});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return ()=>{
+      audio.pause();
+      audio.src="";
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   },[]);
 
   // ガチャやさん開閉でBGM切替（将来のガチャBGM対応）
